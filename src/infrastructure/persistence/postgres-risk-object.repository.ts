@@ -2,6 +2,8 @@ import { Inject, Injectable } from '@nestjs/common';
 import { Pool } from 'pg';
 import type { RiskObject } from '../../core/risk-object/domain/risk-object.js';
 import type {
+  RiskObjectChangeHistoryDetails,
+  RiskObjectChangeHistoryPage,
   RiskObjectDetails,
   RiskObjectListPage,
   RiskObjectRepository,
@@ -67,6 +69,99 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
     };
   }
 
+  async getChangeHistoryById(
+    companyId: string,
+    historyId: number,
+  ): Promise<RiskObjectChangeHistoryDetails | null> {
+    const result = await this.pool.query<{
+      id: number;
+      riskObjectId: string;
+      changedAt: Date;
+      riskObjectName: string;
+      description: string;
+      authorName: string;
+    }>(
+      `
+        SELECT
+          id,
+          "riskObjectId" AS "riskObjectId",
+          "changedAt" AS "changedAt",
+          name AS "riskObjectName",
+          "changeComment" AS description,
+          "authorName" AS "authorName"
+        FROM risk_object_history
+        WHERE "companyId" = $1 AND id = $2
+        LIMIT 1
+      `,
+      [companyId, historyId],
+    );
+
+    const row = result.rows[0];
+    if (!row) {
+      return null;
+    }
+
+    return {
+      id: row.id,
+      riskObjectId: row.riskObjectId,
+      changedAt: new Date(row.changedAt),
+      riskObjectName: row.riskObjectName,
+      description: row.description,
+      authorName: row.authorName,
+    };
+  }
+
+  async getChangeHistoryPage(
+    companyId: string,
+    page: number,
+    pageSize: number,
+    q?: string,
+  ): Promise<RiskObjectChangeHistoryPage> {
+    const offset = (page - 1) * pageSize;
+    const limitWithLookahead = pageSize + 1;
+    const searchQuery = q ? `%${q}%` : null;
+
+    const result = await this.pool.query<{
+      id: number;
+      riskObjectId: string;
+      name: string;
+      changeComment: string;
+      active: boolean;
+      changedAt: Date;
+    }>(
+      `
+        SELECT
+          id,
+          "riskObjectId" AS "riskObjectId",
+          name,
+          "changeComment" AS "changeComment",
+          active,
+          "changedAt" AS "changedAt"
+        FROM risk_object_history
+        WHERE "companyId" = $1
+          AND ($2::text IS NULL OR name ILIKE $2 OR "changeComment" ILIKE $2)
+        ORDER BY "changedAt" DESC, id DESC
+        LIMIT $3 OFFSET $4
+      `,
+      [companyId, searchQuery, limitWithLookahead, offset],
+    );
+
+    const hasMore = result.rows.length > pageSize;
+    const visibleRows = hasMore ? result.rows.slice(0, pageSize) : result.rows;
+
+    return {
+      items: visibleRows.map((row) => ({
+        id: row.id,
+        riskObjectId: row.riskObjectId,
+        name: row.name,
+        changeComment: row.changeComment,
+        status: row.active ? 'active' : 'archived',
+        changedAt: new Date(row.changedAt),
+      })),
+      hasMore,
+    };
+  }
+
   async getById(companyId: string, id: string): Promise<RiskObjectDetails | null> {
     const result = await this.pool.query<{
       id: string;
@@ -101,20 +196,112 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
   }
 
   async updateById(input: UpdateRiskObjectInput): Promise<Date | null> {
-    const active = input.status === undefined ? null : input.status === 'active';
+    const client = await this.pool.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      const currentResult = await client.query<{
+        id: string;
+        companyId: string;
+        code: string;
+        name: string;
+        definition: Record<string, unknown>;
+        active: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+      }>(
+        `
+          SELECT
+            id,
+            "companyId" AS "companyId",
+            code,
+            name,
+            definition,
+            active,
+            "createdAt" AS "createdAt",
+            "updatedAt" AS "updatedAt"
+          FROM risk_object
+          WHERE "companyId" = $1 AND id = $2
+          FOR UPDATE
+        `,
+        [input.companyId, input.id],
+      );
+
+      const currentRow = currentResult.rows[0];
+      if (!currentRow) {
+        await client.query('ROLLBACK');
+        return null;
+      }
+
+      await client.query(
+        `
+          INSERT INTO risk_object_history (
+            "riskObjectId",
+            "companyId",
+            code,
+            name,
+            definition,
+            active,
+            "createdAt",
+            "updatedAt",
+            "changeComment",
+            "authorName",
+            "changedAt"
+          )
+          VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, NOW())
+        `,
+        [
+          currentRow.id,
+          currentRow.companyId,
+          currentRow.code,
+          currentRow.name,
+          JSON.stringify(currentRow.definition),
+          currentRow.active,
+          currentRow.createdAt,
+          currentRow.updatedAt,
+          input.changeComment,
+          input.authorName,
+        ],
+      );
+
+      const updateResult = await client.query<{ updatedAt: Date }>(
+        `
+          UPDATE risk_object
+          SET
+            name = $3,
+            definition = $4::jsonb,
+            "updatedAt" = NOW()
+          WHERE "companyId" = $1 AND id = $2
+          RETURNING "updatedAt" AS "updatedAt"
+        `,
+        [input.companyId, input.id, input.name, JSON.stringify(input.definition)],
+      );
+
+      await client.query('COMMIT');
+      const updatedRow = updateResult.rows[0];
+      return updatedRow ? new Date(updatedRow.updatedAt) : null;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async updateStatusById(companyId: string, id: string, status: 'active' | 'archived'): Promise<Date | null> {
+    const active = status === 'active';
 
     const result = await this.pool.query<{ updatedAt: Date }>(
       `
         UPDATE risk_object
         SET
-          name = $3,
-          definition = $4::jsonb,
-          active = COALESCE($5, active),
+          active = $3,
           "updatedAt" = NOW()
         WHERE "companyId" = $1 AND id = $2
-        RETURNING "updatedAt"
+        RETURNING "updatedAt" AS "updatedAt"
       `,
-      [input.companyId, input.id, input.name, JSON.stringify(input.definition), active],
+      [companyId, id, active],
     );
 
     const updatedRow = result.rows[0];

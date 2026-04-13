@@ -9,6 +9,7 @@ import {
   Post,
   Put,
   Query,
+  Req,
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
@@ -24,16 +25,28 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { CreateRiskObjectUseCase } from '../../core/risk-object/use-cases/create-risk-object.use-case.js';
+import { GetRiskObjectChangeHistoryByIdUseCase } from '../../core/risk-object/use-cases/get-risk-object-change-history-by-id.use-case.js';
+import { GetRiskObjectChangeHistoryUseCase } from '../../core/risk-object/use-cases/get-risk-object-change-history.use-case.js';
 import { GetRiskObjectByIdUseCase } from '../../core/risk-object/use-cases/get-risk-object-by-id.use-case.js';
 import { GetRiskObjectsUseCase } from '../../core/risk-object/use-cases/get-risk-objects.use-case.js';
 import { UpdateRiskObjectByIdUseCase } from '../../core/risk-object/use-cases/update-risk-object-by-id.use-case.js';
+import { UpdateRiskObjectStatusUseCase } from '../../core/risk-object/use-cases/update-risk-object-status.use-case.js';
+import type { AuthenticatedUser } from '../../core/auth/domain/authenticated-user.js';
 import { DomainValidationError } from '../../core/shared/errors/domain-validation.error.js';
 import { CreateRiskObjectRequestDto } from './dto/create-risk-object-request.dto.js';
+import { GetRiskObjectChangeHistoryByIdResponseDto } from './dto/get-risk-object-change-history-by-id-response.dto.js';
 import { CreateRiskObjectResponseDto } from './dto/create-risk-object-response.dto.js';
+import { GetRiskObjectChangeHistoryResponseDto } from './dto/get-risk-object-change-history-response.dto.js';
 import { GetRiskObjectByIdResponseDto } from './dto/get-risk-object-by-id-response.dto.js';
 import { GetRiskObjectsResponseDto } from './dto/get-risk-objects-response.dto.js';
 import { PutRiskObjectByIdRequestDto } from './dto/put-risk-object-by-id-request.dto.js';
 import { PutRiskObjectByIdResponseDto } from './dto/put-risk-object-by-id-response.dto.js';
+import { PutRiskObjectStatusRequestDto } from './dto/put-risk-object-status-request.dto.js';
+import type { Request } from 'express';
+
+type RequestWithAuthUser = Request & {
+  authenticatedUser?: AuthenticatedUser;
+};
 
 @ApiTags('Risk Objects')
 @ApiBearerAuth('bearer')
@@ -41,9 +54,12 @@ import { PutRiskObjectByIdResponseDto } from './dto/put-risk-object-by-id-respon
 export class RiskObjectController {
   constructor(
     private readonly createRiskObjectUseCase: CreateRiskObjectUseCase,
+    private readonly getRiskObjectChangeHistoryUseCase: GetRiskObjectChangeHistoryUseCase,
+    private readonly getRiskObjectChangeHistoryByIdUseCase: GetRiskObjectChangeHistoryByIdUseCase,
     private readonly getRiskObjectsUseCase: GetRiskObjectsUseCase,
     private readonly getRiskObjectByIdUseCase: GetRiskObjectByIdUseCase,
     private readonly updateRiskObjectByIdUseCase: UpdateRiskObjectByIdUseCase,
+    private readonly updateRiskObjectStatusUseCase: UpdateRiskObjectStatusUseCase,
   ) {}
 
   @ApiOperation({ summary: 'Создать рисковый объект' })
@@ -67,6 +83,62 @@ export class RiskObjectController {
       return {
         id: riskObject.id,
         savedAt: riskObject.createdAt.toISOString(),
+      };
+    } catch (error) {
+      if (error instanceof DomainValidationError) {
+        throw new BadRequestException(error.message);
+      }
+
+      throw error;
+    }
+  }
+
+  @ApiOperation({ summary: 'История изменений рисковых объектов' })
+  @ApiHeader({ name: 'CompanyId', required: true, description: 'ID компании' })
+  @ApiQuery({ name: 'page', required: true, example: 1 })
+  @ApiQuery({ name: 'pageSize', required: true, example: 5 })
+  @ApiQuery({ name: 'q', required: false, example: 'иванов' })
+  @ApiOkResponse({ type: GetRiskObjectChangeHistoryResponseDto })
+  @ApiBadRequestResponse({ description: 'Некорректные параметры page/pageSize/q' })
+  @Get('risk-objects/change-history')
+  async getRiskObjectChangeHistory(
+    @Headers('companyid') companyIdHeader: string | undefined,
+    @Query('page') pageQuery?: string,
+    @Query('pageSize') pageSizeQuery?: string,
+    @Query('q') qQuery?: string,
+  ): Promise<GetRiskObjectChangeHistoryResponseDto> {
+    const companyId = this.parseRequiredHeader(companyIdHeader, 'CompanyId');
+    const page = this.parseRequiredPositiveInt(pageQuery, 'page');
+    const pageSize = this.parseRequiredPositiveInt(pageSizeQuery, 'pageSize');
+
+    try {
+      const historyRequest: {
+        companyId: string;
+        page: number;
+        pageSize: number;
+        q?: string;
+      } = {
+        companyId,
+        page,
+        pageSize,
+      };
+
+      if (qQuery !== undefined) {
+        historyRequest.q = qQuery;
+      }
+
+      const result = await this.getRiskObjectChangeHistoryUseCase.execute(historyRequest);
+
+      return {
+        items: result.items.map((item) => ({
+          id: item.id,
+          riskObjectId: item.riskObjectId,
+          name: item.name,
+          changeComment: item.changeComment,
+          status: item.status,
+          changedAt: item.changedAt.toISOString(),
+        })),
+        hasMore: result.hasMore,
       };
     } catch (error) {
       if (error instanceof DomainValidationError) {
@@ -166,9 +238,11 @@ export class RiskObjectController {
     @Headers('companyid') companyIdHeader: string | undefined,
     @Param('id') id: string | undefined,
     @Body() body: PutRiskObjectByIdRequestDto,
+    @Req() request: RequestWithAuthUser,
   ): Promise<PutRiskObjectByIdResponseDto> {
     const companyId = this.parseRequiredHeader(companyIdHeader, 'CompanyId');
     const riskObjectId = this.parseRequiredHeader(id, 'id');
+    const authorName = request.authenticatedUser?.username?.trim() || 'Unknown';
 
     try {
       const updateRequest: {
@@ -176,17 +250,16 @@ export class RiskObjectController {
         id: string;
         name: string;
         definition: Record<string, unknown>;
-        status?: 'active' | 'archived';
+        changeComment: string;
+        authorName: string;
       } = {
         companyId,
         id: riskObjectId,
         name: body.name,
         definition: body.definition,
+        changeComment: body.changeComment,
+        authorName,
       };
-
-      if (body.status !== undefined) {
-        updateRequest.status = body.status;
-      }
 
       const savedAt = await this.updateRiskObjectByIdUseCase.execute(updateRequest);
 
@@ -197,6 +270,87 @@ export class RiskObjectController {
       return {
         id: riskObjectId,
         savedAt: savedAt.toISOString(),
+      };
+    } catch (error) {
+      if (error instanceof DomainValidationError) {
+        throw new BadRequestException(error.message);
+      }
+
+      throw error;
+    }
+  }
+
+  @ApiOperation({ summary: 'Смена статуса рискового объекта' })
+  @ApiHeader({ name: 'CompanyId', required: true, description: 'ID компании' })
+  @ApiParam({ name: 'id', required: true, example: 'ro-1' })
+  @ApiBody({ type: PutRiskObjectStatusRequestDto })
+  @ApiOkResponse({ type: PutRiskObjectByIdResponseDto })
+  @ApiNotFoundResponse({ description: 'Рисковый объект не найден' })
+  @ApiBadRequestResponse({ description: 'Некорректный id, CompanyId или status' })
+  @Put('risk-objects/:id/status')
+  async putRiskObjectStatus(
+    @Headers('companyid') companyIdHeader: string | undefined,
+    @Param('id') id: string | undefined,
+    @Body() body: PutRiskObjectStatusRequestDto,
+  ): Promise<PutRiskObjectByIdResponseDto> {
+    const companyId = this.parseRequiredHeader(companyIdHeader, 'CompanyId');
+    const riskObjectId = this.parseRequiredHeader(id, 'id');
+
+    try {
+      const savedAt = await this.updateRiskObjectStatusUseCase.execute({
+        companyId,
+        id: riskObjectId,
+        status: body.status,
+      });
+
+      if (!savedAt) {
+        throw new NotFoundException('Risk object not found.');
+      }
+
+      return {
+        id: riskObjectId,
+        savedAt: savedAt.toISOString(),
+      };
+    } catch (error) {
+      if (error instanceof DomainValidationError) {
+        throw new BadRequestException(error.message);
+      }
+
+      throw error;
+    }
+  }
+
+  @ApiOperation({ summary: 'Детали записи истории изменений' })
+  @ApiHeader({ name: 'CompanyId', required: true, description: 'ID компании' })
+  @ApiParam({ name: 'historyId', required: true, example: 'roh-12' })
+  @ApiOkResponse({ type: GetRiskObjectChangeHistoryByIdResponseDto })
+  @ApiNotFoundResponse({ description: 'Запись истории не найдена' })
+  @ApiBadRequestResponse({ description: 'Некорректный historyId или CompanyId' })
+  @Get('risk-objects/change-history/:historyId')
+  async getRiskObjectChangeHistoryById(
+    @Headers('companyid') companyIdHeader: string | undefined,
+    @Param('historyId') historyIdParam: string | undefined,
+  ): Promise<GetRiskObjectChangeHistoryByIdResponseDto> {
+    const companyId = this.parseRequiredHeader(companyIdHeader, 'CompanyId');
+    const historyId = this.parseRequiredHeader(historyIdParam, 'historyId');
+
+    try {
+      const historyRecord = await this.getRiskObjectChangeHistoryByIdUseCase.execute({
+        companyId,
+        historyId,
+      });
+
+      if (!historyRecord) {
+        throw new NotFoundException('Risk object change history record not found.');
+      }
+
+      return {
+        id: `roh-${historyRecord.id}`,
+        riskObjectId: historyRecord.riskObjectId,
+        changedAt: historyRecord.changedAt.toISOString(),
+        riskObjectName: historyRecord.riskObjectName,
+        description: historyRecord.description,
+        authorName: historyRecord.authorName,
       };
     } catch (error) {
       if (error instanceof DomainValidationError) {

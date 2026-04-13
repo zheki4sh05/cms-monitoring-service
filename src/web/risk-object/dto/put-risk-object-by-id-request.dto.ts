@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 
 export class PutRiskObjectByIdRequestDto {
   @ApiProperty({ example: 'Название объекта' })
@@ -14,6 +14,6 @@ export class PutRiskObjectByIdRequestDto {
   })
   definition!: Record<string, unknown>;
 
-  @ApiPropertyOptional({ enum: ['active', 'archived'], example: 'active' })
-  status?: 'active' | 'archived';
+  @ApiProperty({ example: 'Обновил ключи и статус' })
+  changeComment!: string;
 }

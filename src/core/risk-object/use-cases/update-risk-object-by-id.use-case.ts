@@ -1,15 +1,13 @@
 import { DomainValidationError } from '../../shared/errors/domain-validation.error.js';
-import type {
-  RiskObjectStatus,
-  RiskObjectRepository,
-} from '../ports/risk-object-repository.port.js';
+import type { RiskObjectRepository } from '../ports/risk-object-repository.port.js';
 
 export interface UpdateRiskObjectByIdInput {
   companyId: string;
   id: string;
   name: string;
   definition: unknown;
-  status?: RiskObjectStatus;
+  changeComment: string;
+  authorName: string;
 }
 
 export class UpdateRiskObjectByIdUseCase {
@@ -32,8 +30,12 @@ export class UpdateRiskObjectByIdUseCase {
       throw new DomainValidationError('definition must be a JSON object.');
     }
 
-    if (input.status && input.status !== 'active' && input.status !== 'archived') {
-      throw new DomainValidationError('status must be active or archived.');
+    if (!input.changeComment?.trim()) {
+      throw new DomainValidationError('changeComment is required.');
+    }
+
+    if (!input.authorName?.trim()) {
+      throw new DomainValidationError('authorName is required.');
     }
 
     const updatePayload: {
@@ -41,17 +43,16 @@ export class UpdateRiskObjectByIdUseCase {
       id: string;
       name: string;
       definition: Record<string, unknown>;
-      status?: RiskObjectStatus;
+      changeComment: string;
+      authorName: string;
     } = {
       companyId: input.companyId.trim(),
       id: input.id.trim(),
       name: input.name.trim(),
       definition: input.definition as Record<string, unknown>,
+      changeComment: input.changeComment.trim(),
+      authorName: input.authorName.trim(),
     };
-
-    if (input.status !== undefined) {
-      updatePayload.status = input.status;
-    }
 
     return this.riskObjectRepository.updateById(updatePayload);
   }

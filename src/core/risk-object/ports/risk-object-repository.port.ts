@@ -17,6 +17,29 @@ export interface RiskObjectListPage {
   hasMore: boolean;
 }
 
+export interface RiskObjectChangeHistoryItem {
+  id: number;
+  riskObjectId: string;
+  name: string;
+  changeComment: string;
+  status: RiskObjectStatus;
+  changedAt: Date;
+}
+
+export interface RiskObjectChangeHistoryPage {
+  items: RiskObjectChangeHistoryItem[];
+  hasMore: boolean;
+}
+
+export interface RiskObjectChangeHistoryDetails {
+  id: number;
+  riskObjectId: string;
+  changedAt: Date;
+  riskObjectName: string;
+  description: string;
+  authorName: string;
+}
+
 export interface RiskObjectDetails {
   id: string;
   code: string;
@@ -31,12 +54,24 @@ export interface UpdateRiskObjectInput {
   id: string;
   name: string;
   definition: Record<string, unknown>;
-  status?: RiskObjectStatus;
+  changeComment: string;
+  authorName: string;
 }
 
 export interface RiskObjectRepository {
   save(riskObject: RiskObject): Promise<void>;
   getListPage(companyId: string, page: number, pageSize: number): Promise<RiskObjectListPage>;
+  getChangeHistoryPage(
+    companyId: string,
+    page: number,
+    pageSize: number,
+    q?: string,
+  ): Promise<RiskObjectChangeHistoryPage>;
+  getChangeHistoryById(
+    companyId: string,
+    historyId: number,
+  ): Promise<RiskObjectChangeHistoryDetails | null>;
   getById(companyId: string, id: string): Promise<RiskObjectDetails | null>;
   updateById(input: UpdateRiskObjectInput): Promise<Date | null>;
+  updateStatusById(companyId: string, id: string, status: RiskObjectStatus): Promise<Date | null>;
 }

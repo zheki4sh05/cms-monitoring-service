@@ -3,9 +3,12 @@ import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { ACCESS_TOKEN_VALIDATOR } from './core/auth/ports/access-token-validator.port.js';
 import { CreateRiskObjectUseCase } from './core/risk-object/use-cases/create-risk-object.use-case.js';
+import { GetRiskObjectChangeHistoryByIdUseCase } from './core/risk-object/use-cases/get-risk-object-change-history-by-id.use-case.js';
+import { GetRiskObjectChangeHistoryUseCase } from './core/risk-object/use-cases/get-risk-object-change-history.use-case.js';
 import { GetRiskObjectByIdUseCase } from './core/risk-object/use-cases/get-risk-object-by-id.use-case.js';
 import { GetRiskObjectsUseCase } from './core/risk-object/use-cases/get-risk-objects.use-case.js';
 import { UpdateRiskObjectByIdUseCase } from './core/risk-object/use-cases/update-risk-object-by-id.use-case.js';
+import { UpdateRiskObjectStatusUseCase } from './core/risk-object/use-cases/update-risk-object-status.use-case.js';
 import { RISK_OBJECT_REPOSITORY } from './core/risk-object/ports/risk-object-repository.port.js';
 import type { RiskObjectRepository } from './core/risk-object/ports/risk-object-repository.port.js';
 import { UUID_GENERATOR } from './core/shared/ports/uuid-generator.port.js';
@@ -56,6 +59,18 @@ import { RiskObjectController } from './web/risk-object/risk-object.controller.j
         new CreateRiskObjectUseCase(riskObjectRepository, uuidGenerator),
     },
     {
+      provide: GetRiskObjectChangeHistoryUseCase,
+      inject: [RISK_OBJECT_REPOSITORY],
+      useFactory: (riskObjectRepository: RiskObjectRepository) =>
+        new GetRiskObjectChangeHistoryUseCase(riskObjectRepository),
+    },
+    {
+      provide: GetRiskObjectChangeHistoryByIdUseCase,
+      inject: [RISK_OBJECT_REPOSITORY],
+      useFactory: (riskObjectRepository: RiskObjectRepository) =>
+        new GetRiskObjectChangeHistoryByIdUseCase(riskObjectRepository),
+    },
+    {
       provide: GetRiskObjectsUseCase,
       inject: [RISK_OBJECT_REPOSITORY],
       useFactory: (riskObjectRepository: RiskObjectRepository) =>
@@ -72,6 +87,12 @@ import { RiskObjectController } from './web/risk-object/risk-object.controller.j
       inject: [RISK_OBJECT_REPOSITORY],
       useFactory: (riskObjectRepository: RiskObjectRepository) =>
         new UpdateRiskObjectByIdUseCase(riskObjectRepository),
+    },
+    {
+      provide: UpdateRiskObjectStatusUseCase,
+      inject: [RISK_OBJECT_REPOSITORY],
+      useFactory: (riskObjectRepository: RiskObjectRepository) =>
+        new UpdateRiskObjectStatusUseCase(riskObjectRepository),
     },
   ],
 })

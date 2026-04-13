@@ -6,6 +6,7 @@ import type {
   RiskObjectChangeHistoryPage,
   RiskObjectDetails,
   RiskObjectListPage,
+  RiskObjectModelBrief,
   RiskObjectRepository,
   UpdateRiskObjectInput,
 } from '../../core/risk-object/ports/risk-object-repository.port.js';
@@ -31,6 +32,20 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
         riskObject.active,
       ],
     );
+  }
+
+  async listModelsBrief(companyId: string): Promise<RiskObjectModelBrief[]> {
+    const result = await this.pool.query<{ id: string; name: string }>(
+      `
+        SELECT id, name
+        FROM risk_object
+        WHERE "companyId" = $1
+        ORDER BY name ASC, id ASC
+      `,
+      [companyId],
+    );
+
+    return result.rows.map((row) => ({ id: row.id, name: row.name }));
   }
 
   async getListPage(companyId: string, page: number, pageSize: number): Promise<RiskObjectListPage> {

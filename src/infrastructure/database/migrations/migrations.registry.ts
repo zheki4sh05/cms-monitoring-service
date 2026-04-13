@@ -6,6 +6,9 @@ import { normalizeRiskObjectCodeFormatMigration } from './202604131400-normalize
 import { addCompanyIdToRiskObjectMigration } from './202604131500-add-company-id-to-risk-object.migration.js';
 import { createRiskObjectHistoryTableMigration } from './202604131700-create-risk-object-history-table.migration.js';
 import { addAuthorNameToRiskObjectHistoryMigration } from './202604131800-add-author-name-to-risk-object-history.migration.js';
+import { createIntegrationConfigTableMigration } from './202604131900-create-integration-config-table.migration.js';
+import { addStatusAuthorToIntegrationConfigMigration } from './202604132000-add-status-author-to-integration-config.migration.js';
+import { createIntegrationHistoryTableMigration } from './202604132100-create-integration-history-table.migration.js';
 import type { Migration } from './migration.interface.js';
 
 export const MIGRATIONS: Migration[] = [
@@ -17,4 +20,7 @@ export const MIGRATIONS: Migration[] = [
   addCompanyIdToRiskObjectMigration,
   createRiskObjectHistoryTableMigration,
   addAuthorNameToRiskObjectHistoryMigration,
+  createIntegrationConfigTableMigration,
+  addStatusAuthorToIntegrationConfigMigration,
+  createIntegrationHistoryTableMigration,
 ];

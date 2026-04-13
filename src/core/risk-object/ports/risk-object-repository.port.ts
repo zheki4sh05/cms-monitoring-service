@@ -17,6 +17,11 @@ export interface RiskObjectListPage {
   hasMore: boolean;
 }
 
+export interface RiskObjectModelBrief {
+  id: string;
+  name: string;
+}
+
 export interface RiskObjectChangeHistoryItem {
   id: number;
   riskObjectId: string;
@@ -60,6 +65,7 @@ export interface UpdateRiskObjectInput {
 
 export interface RiskObjectRepository {
   save(riskObject: RiskObject): Promise<void>;
+  listModelsBrief(companyId: string): Promise<RiskObjectModelBrief[]>;
   getListPage(companyId: string, page: number, pageSize: number): Promise<RiskObjectListPage>;
   getChangeHistoryPage(
     companyId: string,

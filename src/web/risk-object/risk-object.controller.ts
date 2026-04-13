@@ -28,6 +28,7 @@ import { CreateRiskObjectUseCase } from '../../core/risk-object/use-cases/create
 import { GetRiskObjectChangeHistoryByIdUseCase } from '../../core/risk-object/use-cases/get-risk-object-change-history-by-id.use-case.js';
 import { GetRiskObjectChangeHistoryUseCase } from '../../core/risk-object/use-cases/get-risk-object-change-history.use-case.js';
 import { GetRiskObjectByIdUseCase } from '../../core/risk-object/use-cases/get-risk-object-by-id.use-case.js';
+import { GetRiskObjectModelsUseCase } from '../../core/risk-object/use-cases/get-risk-object-models.use-case.js';
 import { GetRiskObjectsUseCase } from '../../core/risk-object/use-cases/get-risk-objects.use-case.js';
 import { UpdateRiskObjectByIdUseCase } from '../../core/risk-object/use-cases/update-risk-object-by-id.use-case.js';
 import { UpdateRiskObjectStatusUseCase } from '../../core/risk-object/use-cases/update-risk-object-status.use-case.js';
@@ -38,6 +39,7 @@ import { GetRiskObjectChangeHistoryByIdResponseDto } from './dto/get-risk-object
 import { CreateRiskObjectResponseDto } from './dto/create-risk-object-response.dto.js';
 import { GetRiskObjectChangeHistoryResponseDto } from './dto/get-risk-object-change-history-response.dto.js';
 import { GetRiskObjectByIdResponseDto } from './dto/get-risk-object-by-id-response.dto.js';
+import { GetRiskObjectModelsResponseDto } from './dto/get-risk-object-models-response.dto.js';
 import { GetRiskObjectsResponseDto } from './dto/get-risk-objects-response.dto.js';
 import { PutRiskObjectByIdRequestDto } from './dto/put-risk-object-by-id-request.dto.js';
 import { PutRiskObjectByIdResponseDto } from './dto/put-risk-object-by-id-response.dto.js';
@@ -56,6 +58,7 @@ export class RiskObjectController {
     private readonly createRiskObjectUseCase: CreateRiskObjectUseCase,
     private readonly getRiskObjectChangeHistoryUseCase: GetRiskObjectChangeHistoryUseCase,
     private readonly getRiskObjectChangeHistoryByIdUseCase: GetRiskObjectChangeHistoryByIdUseCase,
+    private readonly getRiskObjectModelsUseCase: GetRiskObjectModelsUseCase,
     private readonly getRiskObjectsUseCase: GetRiskObjectsUseCase,
     private readonly getRiskObjectByIdUseCase: GetRiskObjectByIdUseCase,
     private readonly updateRiskObjectByIdUseCase: UpdateRiskObjectByIdUseCase,
@@ -140,6 +143,27 @@ export class RiskObjectController {
         })),
         hasMore: result.hasMore,
       };
+    } catch (error) {
+      if (error instanceof DomainValidationError) {
+        throw new BadRequestException(error.message);
+      }
+
+      throw error;
+    }
+  }
+
+  @ApiOperation({ summary: 'Краткий список моделей рисковых объектов (id и name)' })
+  @ApiHeader({ name: 'CompanyId', required: true, description: 'ID компании' })
+  @ApiOkResponse({ type: GetRiskObjectModelsResponseDto })
+  @Get('risk-object-models')
+  async getRiskObjectModels(
+    @Headers('companyid') companyIdHeader: string | undefined,
+  ): Promise<GetRiskObjectModelsResponseDto> {
+    const companyId = this.parseRequiredHeader(companyIdHeader, 'CompanyId');
+
+    try {
+      const items = await this.getRiskObjectModelsUseCase.execute({ companyId });
+      return { items };
     } catch (error) {
       if (error instanceof DomainValidationError) {
         throw new BadRequestException(error.message);

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import { Pool } from 'pg';
 import type { PoolClient } from 'pg';
@@ -26,8 +27,8 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
 
       await client.query(
         `
-          INSERT INTO risk_object (id, "companyId", code, name, definition, "createdAt", "updatedAt", active)
-          VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8)
+          INSERT INTO risk_object (id, "companyId", code, name, definition, "createdAt", "updatedAt", active, uuid)
+          VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9::uuid)
         `,
         [
           riskObject.id,
@@ -38,6 +39,7 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
           riskObject.createdAt,
           riskObject.updatedAt,
           riskObject.active,
+          randomUUID(),
         ],
       );
 
@@ -51,9 +53,9 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
   }
 
   async listModelsBrief(companyId: string): Promise<RiskObjectModelBrief[]> {
-    const result = await this.pool.query<{ id: string; name: string }>(
+    const result = await this.pool.query<{ id: string; name: string; uuid: string }>(
       `
-        SELECT id, name
+        SELECT id, name, uuid::text AS uuid
         FROM risk_object
         WHERE "companyId" = $1
         ORDER BY name ASC, id ASC
@@ -63,7 +65,7 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
 
     return result.rows.map((row) => ({
       id: row.id,
-      uuid: row.id,
+      uuid: row.uuid,
       name: row.name,
     }));
   }

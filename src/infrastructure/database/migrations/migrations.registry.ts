@@ -10,6 +10,7 @@ import { addAuthorNameToRiskObjectHistoryMigration } from './202604131800-add-au
 import { createIntegrationConfigTableMigration } from './202604131900-create-integration-config-table.migration.js';
 import { addStatusAuthorToIntegrationConfigMigration } from './202604132000-add-status-author-to-integration-config.migration.js';
 import { createIntegrationHistoryTableMigration } from './202604132100-create-integration-history-table.migration.js';
+import { addUuidColumnToRiskObjectMigration } from './202604132200-add-uuid-column-to-risk-object.migration.js';
 import type { Migration } from './migration.interface.js';
 
 export const MIGRATIONS: Migration[] = [
@@ -25,4 +26,5 @@ export const MIGRATIONS: Migration[] = [
   createIntegrationConfigTableMigration,
   addStatusAuthorToIntegrationConfigMigration,
   createIntegrationHistoryTableMigration,
+  addUuidColumnToRiskObjectMigration,
 ];

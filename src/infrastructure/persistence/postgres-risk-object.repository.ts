@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Pool } from 'pg';
+import type { PoolClient } from 'pg';
 import type { RiskObject } from '../../core/risk-object/domain/risk-object.js';
 import type {
   RiskObjectChangeHistoryDetails,
@@ -17,21 +18,36 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
   constructor(@Inject(PG_POOL) private readonly pool: Pool) {}
 
   async save(riskObject: RiskObject): Promise<void> {
-    await this.pool.query(
-      `
-        INSERT INTO risk_object (id, "companyId", name, definition, "createdAt", "updatedAt", active)
-        VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7)
-      `,
-      [
-        riskObject.id,
-        riskObject.companyId,
-        riskObject.name,
-        JSON.stringify(riskObject.definition),
-        riskObject.createdAt,
-        riskObject.updatedAt,
-        riskObject.active,
-      ],
-    );
+    const client = await this.pool.connect();
+
+    try {
+      await client.query('BEGIN');
+      const code = await this.getNextCompanyScopedCode(client, riskObject.companyId);
+
+      await client.query(
+        `
+          INSERT INTO risk_object (id, "companyId", code, name, definition, "createdAt", "updatedAt", active)
+          VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8)
+        `,
+        [
+          riskObject.id,
+          riskObject.companyId,
+          code,
+          riskObject.name,
+          JSON.stringify(riskObject.definition),
+          riskObject.createdAt,
+          riskObject.updatedAt,
+          riskObject.active,
+        ],
+      );
+
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async listModelsBrief(companyId: string): Promise<RiskObjectModelBrief[]> {
@@ -45,7 +61,11 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
       [companyId],
     );
 
-    return result.rows.map((row) => ({ id: row.id, name: row.name }));
+    return result.rows.map((row) => ({
+      id: row.id,
+      uuid: row.id,
+      name: row.name,
+    }));
   }
 
   async getListPage(companyId: string, page: number, pageSize: number): Promise<RiskObjectListPage> {
@@ -321,5 +341,22 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
 
     const updatedRow = result.rows[0];
     return updatedRow ? new Date(updatedRow.updatedAt) : null;
+  }
+
+  private async getNextCompanyScopedCode(client: PoolClient, companyId: string): Promise<string> {
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [companyId]);
+
+    const result = await client.query<{ nextNumber: number }>(
+      `
+        SELECT COALESCE(MAX((substring(code from 'RO-(\\d+)'))::int), 0) + 1 AS "nextNumber"
+        FROM risk_object
+        WHERE "companyId" = $1
+          AND code ~ '^RO-\\d+$'
+      `,
+      [companyId],
+    );
+
+    const nextNumber = result.rows[0]?.nextNumber ?? 1;
+    return `RO-${String(nextNumber).padStart(3, '0')}`;
   }
 }

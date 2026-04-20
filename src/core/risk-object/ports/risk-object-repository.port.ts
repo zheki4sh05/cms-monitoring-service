@@ -19,6 +19,7 @@ export interface RiskObjectListPage {
 
 export interface RiskObjectModelBrief {
   id: string;
+  uuid: string;
   name: string;
 }
 

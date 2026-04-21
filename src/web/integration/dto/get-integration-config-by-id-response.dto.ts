@@ -11,6 +11,49 @@ class MappingRuleDto {
   transform?: string;
 }
 
+class PullConfigQueryParamDto {
+  @ApiProperty({ example: 'q' })
+  key!: string;
+
+  @ApiProperty({ example: 'name' })
+  value!: string;
+}
+
+class PullConfigDto {
+  @ApiProperty({ example: 'minutes' })
+  pollingPreset!: string;
+
+  @ApiProperty({ example: 5 })
+  pollingMinutes!: number;
+
+  @ApiProperty({ example: 'basic' })
+  authType!: string;
+
+  @ApiProperty({ example: 'login', required: false })
+  authBasicLogin?: string;
+
+  @ApiProperty({ example: 'password', required: false })
+  authBasicPassword?: string;
+
+  @ApiProperty({ example: '/api/v1/entities' })
+  requestUri!: string;
+
+  @ApiProperty({
+    type: () => [PullConfigQueryParamDto],
+    example: [{ key: 'q', value: 'name' }],
+  })
+  requestQueryParams!: PullConfigQueryParamDto[];
+
+  @ApiProperty({ example: true })
+  pagedPollingEnabled!: boolean;
+
+  @ApiProperty({ example: 8, required: false })
+  pageSize?: number;
+
+  @ApiProperty({ example: false })
+  sinceStartDateEnabled!: boolean;
+}
+
 export class GetIntegrationConfigByIdResponseDto {
   @ApiProperty({ example: 'ic-1' })
   id!: string;
@@ -35,6 +78,13 @@ export class GetIntegrationConfigByIdResponseDto {
     example: [{ from: 'sub', to: 'external_id' }],
   })
   mapping_rules!: MappingRuleDto[];
+
+  @ApiProperty({
+    type: () => PullConfigDto,
+    required: false,
+    nullable: true,
+  })
+  pullConfig?: PullConfigDto | null;
 
   @ApiProperty({ enum: ['active', 'inactive'], example: 'active' })
   status!: 'active' | 'inactive';

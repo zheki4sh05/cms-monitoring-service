@@ -11,6 +11,7 @@ import { createIntegrationConfigTableMigration } from './202604131900-create-int
 import { addStatusAuthorToIntegrationConfigMigration } from './202604132000-add-status-author-to-integration-config.migration.js';
 import { createIntegrationHistoryTableMigration } from './202604132100-create-integration-history-table.migration.js';
 import { addUuidColumnToRiskObjectMigration } from './202604132200-add-uuid-column-to-risk-object.migration.js';
+import { addPullConfigToIntegrationConfigMigration } from './202604211200-add-pull-config-to-integration-config.migration.js';
 import type { Migration } from './migration.interface.js';
 
 export const MIGRATIONS: Migration[] = [
@@ -26,5 +27,6 @@ export const MIGRATIONS: Migration[] = [
   createIntegrationConfigTableMigration,
   addStatusAuthorToIntegrationConfigMigration,
   createIntegrationHistoryTableMigration,
+  addPullConfigToIntegrationConfigMigration,
   addUuidColumnToRiskObjectMigration,
 ];

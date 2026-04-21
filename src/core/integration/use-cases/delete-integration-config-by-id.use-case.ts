@@ -1,23 +1,20 @@
 import { Logger } from '@nestjs/common';
 import { DomainValidationError } from '../../shared/errors/domain-validation.error.js';
-import type {
-  IntegrationConfigDetails,
-  IntegrationConfigRepository,
-} from '../ports/integration-config-repository.port.js';
+import type { IntegrationConfigRepository } from '../ports/integration-config-repository.port.js';
 
-export interface GetIntegrationConfigByIdInput {
+export interface DeleteIntegrationConfigByIdInput {
   companyId: string;
   integrationConfigId: string;
 }
 
-export class GetIntegrationConfigByIdUseCase {
-  private readonly logger = new Logger(GetIntegrationConfigByIdUseCase.name);
+export class DeleteIntegrationConfigByIdUseCase {
+  private readonly logger = new Logger(DeleteIntegrationConfigByIdUseCase.name);
 
   constructor(private readonly integrationConfigRepository: IntegrationConfigRepository) {}
 
-  async execute(input: GetIntegrationConfigByIdInput): Promise<IntegrationConfigDetails | null> {
+  async execute(input: DeleteIntegrationConfigByIdInput): Promise<Date | null> {
     this.logger.log(
-      `Get integration config started (companyId=${input.companyId?.trim()}, id=${input.integrationConfigId?.trim()})`,
+      `Delete integration config started (companyId=${input.companyId?.trim()}, id=${input.integrationConfigId?.trim()})`,
     );
     if (!input.companyId?.trim()) {
       throw new DomainValidationError('companyId is required.');
@@ -27,9 +24,9 @@ export class GetIntegrationConfigByIdUseCase {
       throw new DomainValidationError('id is required.');
     }
 
-    const numericId = this.parseIntegrationConfigId(input.integrationConfigId.trim());
-    this.logger.log(`Validation passed, loading integration config id=${numericId}`);
-    return this.integrationConfigRepository.getById(input.companyId.trim(), numericId);
+    const id = this.parseIntegrationConfigId(input.integrationConfigId.trim());
+    this.logger.log(`Validation passed, deleting integration config id=${id}`);
+    return this.integrationConfigRepository.deleteById(input.companyId.trim(), id);
   }
 
   private parseIntegrationConfigId(value: string): number {

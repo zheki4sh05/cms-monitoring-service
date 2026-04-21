@@ -2,9 +2,11 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { ACCESS_TOKEN_VALIDATOR } from './core/auth/ports/access-token-validator.port.js';
+import { USER_PERMISSION_CHECKER } from './core/auth/ports/user-permission-checker.port.js';
 import { INTEGRATION_CONFIG_REPOSITORY } from './core/integration/ports/integration-config-repository.port.js';
 import type { IntegrationConfigRepository } from './core/integration/ports/integration-config-repository.port.js';
 import { CreateIntegrationConfigUseCase } from './core/integration/use-cases/create-integration-config.use-case.js';
+import { DeleteIntegrationConfigByIdUseCase } from './core/integration/use-cases/delete-integration-config-by-id.use-case.js';
 import { GetIntegrationConfigByIdUseCase } from './core/integration/use-cases/get-integration-config-by-id.use-case.js';
 import { GetIntegrationConfigChangeHistoryUseCase } from './core/integration/use-cases/get-integration-config-change-history.use-case.js';
 import { GetIntegrationConfigsUseCase } from './core/integration/use-cases/get-integration-configs.use-case.js';
@@ -29,6 +31,7 @@ import { CryptoUuidGenerator } from './infrastructure/identifiers/crypto-uuid.ge
 import { PostgresIntegrationConfigRepository } from './infrastructure/persistence/postgres-integration-config.repository.js';
 import { PostgresRiskObjectRepository } from './infrastructure/persistence/postgres-risk-object.repository.js';
 import { JwtAccessTokenValidator } from './infrastructure/security/jwt-access-token.validator.js';
+import { CmsAuthUserPermissionCheckerService } from './infrastructure/security/cms-auth-user-permission-checker.service.js';
 import { AuthenticationGuard } from './web/auth/authentication.guard.js';
 import { IntegrationConfigController } from './web/integration/integration-config.controller.js';
 import { RiskObjectController } from './web/risk-object/risk-object.controller.js';
@@ -48,6 +51,7 @@ import { RiskObjectController } from './web/risk-object/risk-object.controller.j
     PostgresIntegrationConfigRepository,
     PostgresRiskObjectRepository,
     JwtAccessTokenValidator,
+    CmsAuthUserPermissionCheckerService,
     {
       provide: RISK_OBJECT_REPOSITORY,
       useExisting: PostgresRiskObjectRepository,
@@ -55,6 +59,10 @@ import { RiskObjectController } from './web/risk-object/risk-object.controller.j
     {
       provide: ACCESS_TOKEN_VALIDATOR,
       useExisting: JwtAccessTokenValidator,
+    },
+    {
+      provide: USER_PERMISSION_CHECKER,
+      useExisting: CmsAuthUserPermissionCheckerService,
     },
     {
       provide: INTEGRATION_CONFIG_REPOSITORY,
@@ -79,6 +87,12 @@ import { RiskObjectController } from './web/risk-object/risk-object.controller.j
       inject: [INTEGRATION_CONFIG_REPOSITORY],
       useFactory: (integrationConfigRepository: IntegrationConfigRepository) =>
         new CreateIntegrationConfigUseCase(integrationConfigRepository),
+    },
+    {
+      provide: DeleteIntegrationConfigByIdUseCase,
+      inject: [INTEGRATION_CONFIG_REPOSITORY],
+      useFactory: (integrationConfigRepository: IntegrationConfigRepository) =>
+        new DeleteIntegrationConfigByIdUseCase(integrationConfigRepository),
     },
     {
       provide: GetIntegrationConfigsUseCase,

@@ -1,5 +1,6 @@
+import { Logger } from '@nestjs/common';
 import { DomainValidationError } from '../../shared/errors/domain-validation.error.js';
-import type { IntegrationKind } from '../domain/integration-config.js';
+import type { IntegrationKind, PullConfig } from '../domain/integration-config.js';
 import type { IntegrationConfigRepository } from '../ports/integration-config-repository.port.js';
 
 export interface CreateIntegrationConfigInput {
@@ -10,6 +11,7 @@ export interface CreateIntegrationConfigInput {
   endpointUrl: string;
   riskObjectModelId: string;
   mappingRules: unknown;
+  pullConfig?: PullConfig;
 }
 
 export interface CreateIntegrationConfigOutput {
@@ -18,9 +20,14 @@ export interface CreateIntegrationConfigOutput {
 }
 
 export class CreateIntegrationConfigUseCase {
+  private readonly logger = new Logger(CreateIntegrationConfigUseCase.name);
+
   constructor(private readonly integrationConfigRepository: IntegrationConfigRepository) {}
 
   async execute(input: CreateIntegrationConfigInput): Promise<CreateIntegrationConfigOutput> {
+    this.logger.log(
+      `Create integration config started (companyId=${input.companyId?.trim()}, integrationKind=${input.integrationKind}, hasPullConfig=${input.pullConfig !== undefined})`,
+    );
     if (!input.companyId?.trim()) {
       throw new DomainValidationError('companyId is required.');
     }
@@ -47,6 +54,7 @@ export class CreateIntegrationConfigUseCase {
 
     const integrationKind = this.parseIntegrationKind(input.integrationKind);
     const now = new Date();
+    this.logger.log('Validation passed, saving integration config to repository');
 
     const id = await this.integrationConfigRepository.save({
       companyId: input.companyId.trim(),
@@ -55,6 +63,7 @@ export class CreateIntegrationConfigUseCase {
       endpointUrl: input.endpointUrl.trim(),
       riskObjectId: input.riskObjectModelId.trim(),
       mappingRules: input.mappingRules,
+      ...(input.pullConfig !== undefined ? { pullConfig: input.pullConfig } : {}),
       active: true,
       authorName: input.authorName.trim(),
       createdAt: now,

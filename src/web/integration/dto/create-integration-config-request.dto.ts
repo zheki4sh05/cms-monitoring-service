@@ -11,6 +11,49 @@ class MappingRuleDto {
   transform?: string;
 }
 
+class PullConfigQueryParamDto {
+  @ApiProperty({ example: 'q' })
+  key!: string;
+
+  @ApiProperty({ example: 'name' })
+  value!: string;
+}
+
+class PullConfigDto {
+  @ApiProperty({ example: 'minutes' })
+  pollingPreset!: string;
+
+  @ApiProperty({ example: 5 })
+  pollingMinutes!: number;
+
+  @ApiProperty({ example: 'basic' })
+  authType!: string;
+
+  @ApiProperty({ example: 'login', required: false })
+  authBasicLogin?: string;
+
+  @ApiProperty({ example: 'password', required: false })
+  authBasicPassword?: string;
+
+  @ApiProperty({ example: '/api/v1/entities' })
+  requestUri!: string;
+
+  @ApiProperty({
+    type: () => [PullConfigQueryParamDto],
+    example: [{ key: 'q', value: 'name' }],
+  })
+  requestQueryParams!: PullConfigQueryParamDto[];
+
+  @ApiProperty({ example: true })
+  pagedPollingEnabled!: boolean;
+
+  @ApiProperty({ example: 8, required: false })
+  pageSize?: number;
+
+  @ApiProperty({ example: false })
+  sinceStartDateEnabled!: boolean;
+}
+
 export class CreateIntegrationConfigRequestDto {
   @ApiProperty({ example: 'OAuth2: корпоративный SSO' })
   name!: string;
@@ -32,4 +75,22 @@ export class CreateIntegrationConfigRequestDto {
     ],
   })
   mapping_rules!: MappingRuleDto[];
+
+  @ApiProperty({
+    type: () => PullConfigDto,
+    required: false,
+    example: {
+      pollingPreset: 'minutes',
+      pollingMinutes: 5,
+      authType: 'basic',
+      authBasicLogin: 'login',
+      authBasicPassword: 'password',
+      requestUri: '/api/v1/entities',
+      requestQueryParams: [{ key: 'q', value: 'name' }],
+      pagedPollingEnabled: true,
+      pageSize: 8,
+      sinceStartDateEnabled: false,
+    },
+  })
+  pullConfig?: PullConfigDto;
 }

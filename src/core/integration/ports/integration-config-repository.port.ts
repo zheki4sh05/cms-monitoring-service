@@ -1,4 +1,4 @@
-import type { IntegrationConfig, IntegrationKind } from '../domain/integration-config.js';
+import type { IntegrationConfig, IntegrationKind, PullConfig } from '../domain/integration-config.js';
 
 export const INTEGRATION_CONFIG_REPOSITORY = Symbol('INTEGRATION_CONFIG_REPOSITORY');
 
@@ -40,6 +40,7 @@ export interface IntegrationConfigDetails {
   endpointUrl: string;
   riskObjectModelId: string;
   mappingRules: unknown;
+  pullConfig: PullConfig | null;
   status: IntegrationConfigStatus;
   authorName: string;
   updatedAt: Date;
@@ -53,6 +54,7 @@ export interface UpdateIntegrationConfigInput {
   endpointUrl: string;
   riskObjectModelId: string;
   mappingRules: unknown;
+  pullConfig?: PullConfig;
   authorName: string;
   changeComment: string;
 }
@@ -69,4 +71,5 @@ export interface IntegrationConfigRepository {
   getById(companyId: string, id: number): Promise<IntegrationConfigDetails | null>;
   updateById(input: UpdateIntegrationConfigInput): Promise<Date | null>;
   updateStatusById(companyId: string, id: number, status: IntegrationConfigStatus): Promise<Date | null>;
+  deleteById(companyId: string, id: number): Promise<Date | null>;
 }

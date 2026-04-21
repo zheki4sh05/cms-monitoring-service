@@ -1,5 +1,6 @@
+import { Logger } from '@nestjs/common';
 import { DomainValidationError } from '../../shared/errors/domain-validation.error.js';
-import type { IntegrationKind } from '../domain/integration-config.js';
+import type { IntegrationKind, PullConfig } from '../domain/integration-config.js';
 import type { IntegrationConfigRepository } from '../ports/integration-config-repository.port.js';
 
 export interface UpdateIntegrationConfigByIdInput {
@@ -10,13 +11,19 @@ export interface UpdateIntegrationConfigByIdInput {
   endpointUrl: string;
   riskObjectModelId: string;
   mappingRules: unknown;
+  pullConfig?: PullConfig;
   authorName: string;
 }
 
 export class UpdateIntegrationConfigByIdUseCase {
+  private readonly logger = new Logger(UpdateIntegrationConfigByIdUseCase.name);
+
   constructor(private readonly integrationConfigRepository: IntegrationConfigRepository) {}
 
   async execute(input: UpdateIntegrationConfigByIdInput): Promise<Date | null> {
+    this.logger.log(
+      `Update integration config started (companyId=${input.companyId?.trim()}, id=${input.integrationConfigId?.trim()}, hasPullConfig=${input.pullConfig !== undefined})`,
+    );
     if (!input.companyId?.trim()) {
       throw new DomainValidationError('companyId is required.');
     }
@@ -47,6 +54,7 @@ export class UpdateIntegrationConfigByIdUseCase {
 
     const id = this.parseIntegrationConfigId(input.integrationConfigId.trim());
     const integrationKind = this.parseIntegrationKind(input.integrationKind);
+    this.logger.log(`Validation passed, updating integration config id=${id} in repository`);
 
     return this.integrationConfigRepository.updateById({
       companyId: input.companyId.trim(),
@@ -56,6 +64,7 @@ export class UpdateIntegrationConfigByIdUseCase {
       endpointUrl: input.endpointUrl.trim(),
       riskObjectModelId: input.riskObjectModelId.trim(),
       mappingRules: input.mappingRules,
+      ...(input.pullConfig !== undefined ? { pullConfig: input.pullConfig } : {}),
       authorName: input.authorName.trim(),
       changeComment: `Обновлены параметры подключения (#${id})`,
     });

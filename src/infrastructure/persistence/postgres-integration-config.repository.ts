@@ -1,6 +1,6 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Pool } from 'pg';
-import type { IntegrationConfig } from '../../core/integration/domain/integration-config.js';
+import type { IntegrationConfig, PullConfig } from '../../core/integration/domain/integration-config.js';
 import type {
   IntegrationConfigDetails,
   IntegrationConfigHistoryPage,
@@ -12,9 +12,14 @@ import { PG_POOL } from '../database/postgres/postgres.tokens.js';
 
 @Injectable()
 export class PostgresIntegrationConfigRepository implements IntegrationConfigRepository {
+  private readonly logger = new Logger(PostgresIntegrationConfigRepository.name);
+
   constructor(@Inject(PG_POOL) private readonly pool: Pool) {}
 
   async save(config: IntegrationConfig): Promise<number> {
+    this.logger.log(
+      `Inserting integration config (companyId=${config.companyId}, integrationKind=${config.integrationKind}, hasPullConfig=${config.pullConfig !== undefined})`,
+    );
     const result = await this.pool.query<{ id: string }>(
       `
         INSERT INTO integration_config (
@@ -24,12 +29,13 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
           "endpointUrl",
           "riskObjectId",
           "mappingRules",
+          "pullConfig",
           active,
           "authorName",
           "createdAt",
           "updatedAt"
         )
-        VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10)
+        VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9, $10, $11)
         RETURNING id::text AS id
       `,
       [
@@ -38,7 +44,8 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
         config.integrationKind,
         config.endpointUrl,
         config.riskObjectId,
-        JSON.stringify(config.mappingRules),
+        this.stringifyJson(config.mappingRules),
+        this.stringifyJson(config.pullConfig),
         config.active,
         config.authorName,
         config.createdAt,
@@ -143,6 +150,7 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
   }
 
   async getById(companyId: string, id: number): Promise<IntegrationConfigDetails | null> {
+    this.logger.log(`Loading integration config from DB (companyId=${companyId}, id=${id})`);
     const result = await this.pool.query<{
       id: number;
       name: string;
@@ -150,6 +158,7 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
       endpointUrl: string;
       riskObjectModelId: string;
       mappingRules: unknown;
+      pullConfig: PullConfig | null;
       active: boolean;
       authorName: string;
       updatedAt: Date;
@@ -162,6 +171,7 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
           "endpointUrl" AS "endpointUrl",
           "riskObjectId" AS "riskObjectModelId",
           "mappingRules" AS "mappingRules",
+          "pullConfig" AS "pullConfig",
           active,
           "authorName" AS "authorName",
           "updatedAt" AS "updatedAt"
@@ -174,6 +184,7 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
 
     const row = result.rows[0];
     if (!row) {
+      this.logger.warn(`Integration config not found in DB (companyId=${companyId}, id=${id})`);
       return null;
     }
 
@@ -185,6 +196,7 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
       endpointUrl: row.endpointUrl,
       riskObjectModelId: row.riskObjectModelId,
       mappingRules: row.mappingRules,
+      pullConfig: row.pullConfig,
       status: row.active ? 'active' : 'inactive',
       authorName: row.authorName,
       updatedAt: new Date(row.updatedAt),
@@ -192,10 +204,14 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
   }
 
   async updateById(input: UpdateIntegrationConfigInput): Promise<Date | null> {
+    this.logger.log(
+      `Updating integration config in DB transaction (companyId=${input.companyId}, id=${input.id}, hasPullConfig=${input.pullConfig !== undefined})`,
+    );
     const client = await this.pool.connect();
 
     try {
       await client.query('BEGIN');
+      this.logger.log('DB transaction started for integration update');
 
       const currentResult = await client.query<{
         id: number;
@@ -205,6 +221,7 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
         endpointUrl: string;
         riskObjectId: string;
         mappingRules: unknown;
+        pullConfig: PullConfig | null;
         active: boolean;
         authorName: string;
         createdAt: Date;
@@ -219,6 +236,7 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
             "endpointUrl" AS "endpointUrl",
             "riskObjectId" AS "riskObjectId",
             "mappingRules" AS "mappingRules",
+            "pullConfig" AS "pullConfig",
             active,
             "authorName" AS "authorName",
             "createdAt" AS "createdAt",
@@ -232,10 +250,12 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
 
       const currentRow = currentResult.rows[0];
       if (!currentRow) {
+        this.logger.warn(`No row found for update (companyId=${input.companyId}, id=${input.id})`);
         await client.query('ROLLBACK');
         return null;
       }
 
+      this.logger.log(`Writing change history snapshot for integration id=${input.id}`);
       await client.query(
         `
           INSERT INTO integration_history (
@@ -246,6 +266,7 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
             "endpointUrl",
             "riskObjectId",
             "mappingRules",
+            "pullConfig",
             active,
             "authorName",
             "changeComment",
@@ -253,7 +274,7 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
             "updatedAt",
             "changedAt"
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12, NOW())
+          VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9, $10, $11, $12, $13, NOW())
         `,
         [
           currentRow.id,
@@ -262,7 +283,8 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
           currentRow.integrationKind,
           currentRow.endpointUrl,
           currentRow.riskObjectId,
-          JSON.stringify(currentRow.mappingRules),
+          this.stringifyJson(currentRow.mappingRules),
+          this.stringifyJson(currentRow.pullConfig),
           currentRow.active,
           input.authorName,
           input.changeComment,
@@ -271,6 +293,7 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
         ],
       );
 
+      this.logger.log(`Applying integration update for id=${input.id}`);
       const updateResult = await client.query<{ updatedAt: Date }>(
         `
           UPDATE integration_config
@@ -280,7 +303,8 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
             "endpointUrl" = $5,
             "riskObjectId" = $6,
             "mappingRules" = $7::jsonb,
-            "authorName" = $8,
+            "pullConfig" = $8::jsonb,
+            "authorName" = $9,
             "updatedAt" = NOW()
           WHERE "companyId" = $1 AND id = $2
           RETURNING "updatedAt" AS "updatedAt"
@@ -292,16 +316,21 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
           input.integrationKind,
           input.endpointUrl,
           input.riskObjectModelId,
-          JSON.stringify(input.mappingRules),
+          this.stringifyJson(input.mappingRules),
+          this.stringifyJson(input.pullConfig),
           input.authorName,
         ],
       );
 
       await client.query('COMMIT');
+      this.logger.log(`DB transaction committed for integration id=${input.id}`);
       const updatedRow = updateResult.rows[0];
       return updatedRow ? new Date(updatedRow.updatedAt) : null;
     } catch (error) {
       await client.query('ROLLBACK');
+      this.logger.error(
+        `DB transaction rolled back for integration id=${input.id}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
       throw error;
     } finally {
       client.release();
@@ -329,5 +358,33 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
 
     const updatedRow = result.rows[0];
     return updatedRow ? new Date(updatedRow.updatedAt) : null;
+  }
+
+  async deleteById(companyId: string, id: number): Promise<Date | null> {
+    this.logger.log(`Deleting integration config from DB (companyId=${companyId}, id=${id})`);
+    const result = await this.pool.query<{ deletedAt: Date }>(
+      `
+        DELETE FROM integration_config
+        WHERE "companyId" = $1 AND id = $2
+        RETURNING NOW() AS "deletedAt"
+      `,
+      [companyId, id],
+    );
+
+    const deletedRow = result.rows[0];
+    if (!deletedRow) {
+      this.logger.warn(`Integration config not found for deletion (companyId=${companyId}, id=${id})`);
+      return null;
+    }
+
+    return new Date(deletedRow.deletedAt);
+  }
+
+  private stringifyJson(value: unknown): string | null {
+    if (value === undefined) {
+      return null;
+    }
+
+    return JSON.stringify(value);
   }
 }

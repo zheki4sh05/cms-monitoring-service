@@ -4,6 +4,9 @@ export class GetRiskObjectByIdResponseDto {
   @ApiProperty({ example: 'ro-1' })
   id!: string;
 
+  @ApiProperty({ example: '66e521d0-3f76-43a1-847f-01a486f12345' })
+  uuid!: string;
+
   @ApiProperty({ example: 'RO-001' })
   code!: string;
 

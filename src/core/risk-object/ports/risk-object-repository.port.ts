@@ -48,6 +48,7 @@ export interface RiskObjectChangeHistoryDetails {
 
 export interface RiskObjectDetails {
   id: string;
+  uuid: string;
   code: string;
   name: string;
   status: RiskObjectStatus;

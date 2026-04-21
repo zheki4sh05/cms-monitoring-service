@@ -202,6 +202,7 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
   async getById(companyId: string, id: string): Promise<RiskObjectDetails | null> {
     const result = await this.pool.query<{
       id: string;
+      uuid: string;
       code: string;
       name: string;
       active: boolean;
@@ -209,7 +210,7 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
       definition: Record<string, unknown>;
     }>(
       `
-        SELECT id, code, name, active, "updatedAt", definition
+        SELECT id, uuid::text AS uuid, code, name, active, "updatedAt", definition
         FROM risk_object
         WHERE "companyId" = $1 AND id = $2
         LIMIT 1
@@ -224,6 +225,7 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
 
     return {
       id: row.id,
+      uuid: row.uuid,
       code: row.code,
       name: row.name,
       status: row.active ? 'active' : 'archived',

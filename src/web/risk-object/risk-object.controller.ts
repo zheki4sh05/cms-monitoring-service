@@ -235,6 +235,7 @@ export class RiskObjectController {
 
       return {
         id: riskObject.id,
+        uuid: riskObject.uuid,
         code: riskObject.code,
         name: riskObject.name,
         status: riskObject.status,

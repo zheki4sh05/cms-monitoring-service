@@ -1,4 +1,5 @@
 export type IntegrationKind = 'PUSH' | 'PULL' | 'BROKER';
+export type IntegrationRuntimeStatus = 'idle' | 'loading' | 'work' | 'failed' | 'stop';
 
 export interface PullConfigQueryParam {
   key: string;
@@ -28,6 +29,7 @@ export interface IntegrationConfig {
   mappingRules: unknown;
   pullConfig?: PullConfig;
   active: boolean;
+  status: IntegrationRuntimeStatus;
   authorName: string;
   createdAt: Date;
   updatedAt: Date;

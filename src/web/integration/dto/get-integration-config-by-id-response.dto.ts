@@ -86,8 +86,11 @@ export class GetIntegrationConfigByIdResponseDto {
   })
   pullConfig?: PullConfigDto | null;
 
-  @ApiProperty({ enum: ['active', 'inactive'], example: 'active' })
-  status!: 'active' | 'inactive';
+  @ApiProperty({ example: true })
+  active!: boolean;
+
+  @ApiProperty({ enum: ['idle', 'loading', 'work', 'failed', 'stop'], example: 'work' })
+  status!: 'idle' | 'loading' | 'work' | 'failed' | 'stop';
 
   @ApiProperty({ example: 'Мария Петрова' })
   authorName!: string;

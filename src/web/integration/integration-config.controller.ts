@@ -155,6 +155,7 @@ export class IntegrationConfigController {
           number: item.number,
           name: item.name,
           updatedAt: item.updatedAt.toISOString(),
+          active: item.active,
           status: item.status,
           authorName: item.authorName,
         })),
@@ -264,6 +265,7 @@ export class IntegrationConfigController {
         riskObjectModelId: config.riskObjectModelId,
         mapping_rules: mappingRules as { from: string; to: string; transform?: string }[],
         pullConfig: config.pullConfig,
+        active: config.active,
         status: config.status,
         authorName: config.authorName,
         updatedAt: config.updatedAt.toISOString(),
@@ -389,13 +391,13 @@ export class IntegrationConfigController {
     }
   }
 
-  @ApiOperation({ summary: 'Отдельное изменение статуса интеграции' })
+  @ApiOperation({ summary: 'Отдельное изменение флага active интеграции' })
   @ApiHeader({ name: 'CompanyId', required: true, description: 'ID компании' })
   @ApiParam({ name: 'id', required: true, example: 'ic-1' })
   @ApiBody({ type: PutIntegrationConfigStatusRequestDto })
   @ApiOkResponse({ type: PutIntegrationConfigStatusResponseDto })
   @ApiNotFoundResponse({ description: 'Интеграция не найдена' })
-  @ApiBadRequestResponse({ description: 'Некорректный id, CompanyId или status' })
+  @ApiBadRequestResponse({ description: 'Некорректный id, CompanyId или active' })
   @Put('integration-configs/:id/status')
   async putIntegrationConfigStatus(
     @Headers('companyid') companyIdHeader: string | undefined,
@@ -406,15 +408,20 @@ export class IntegrationConfigController {
     await this.assertIntegrationPermission(request, 'MANAGE_INTEGRATIONS');
     const companyId = this.parseRequiredHeader(companyIdHeader, 'CompanyId');
     const integrationConfigId = this.parseRequiredHeader(idParam, 'id');
+    this.logger.log(
+      `PUT /integration-configs/:id/status started (companyId=${companyId}, id=${integrationConfigId}, active=${body.active})`,
+    );
 
     try {
+      this.logger.log(`Updating integration active flag via status endpoint (id=${integrationConfigId})`);
       const savedAt = await this.updateIntegrationConfigStatusUseCase.execute({
         companyId,
         integrationConfigId,
-        status: body.status,
+        active: body.active,
       });
 
       if (!savedAt) {
+        this.logger.warn(`Integration config to update active flag not found (id=${integrationConfigId})`);
         throw new NotFoundException('Integration config not found.');
       }
 
@@ -424,9 +431,13 @@ export class IntegrationConfigController {
       };
     } catch (error) {
       if (error instanceof DomainValidationError) {
+        this.logger.warn(`PUT /integration-configs/:id/status validation failed: ${error.message}`);
         throw new BadRequestException(error.message);
       }
 
+      this.logger.error(
+        `PUT /integration-configs/:id/status failed (id=${integrationConfigId}): ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
       throw error;
     }
   }

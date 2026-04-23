@@ -13,8 +13,11 @@ export class IntegrationConfigListItemDto {
   @ApiProperty({ example: '2026-04-12T08:20:00.000Z' })
   updatedAt!: string;
 
-  @ApiProperty({ enum: ['active', 'inactive'], example: 'active' })
-  status!: 'active' | 'inactive';
+  @ApiProperty({ example: false })
+  active!: boolean;
+
+  @ApiProperty({ enum: ['idle', 'loading', 'work', 'failed', 'stop'], example: 'work' })
+  status!: 'idle' | 'loading' | 'work' | 'failed' | 'stop';
 
   @ApiProperty({ example: 'Мария Петрова' })
   authorName!: string;

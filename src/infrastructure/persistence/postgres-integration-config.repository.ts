@@ -1,11 +1,16 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Pool } from 'pg';
-import type { IntegrationConfig, PullConfig } from '../../core/integration/domain/integration-config.js';
+import type {
+  IntegrationConfig,
+  IntegrationRuntimeStatus,
+  PullConfig,
+} from '../../core/integration/domain/integration-config.js';
 import type {
   IntegrationConfigDetails,
   IntegrationConfigHistoryPage,
   IntegrationConfigListPage,
   IntegrationConfigRepository,
+  IntegrationConfigProcessManagerItem,
   UpdateIntegrationConfigInput,
 } from '../../core/integration/ports/integration-config-repository.port.js';
 import { PG_POOL } from '../database/postgres/postgres.tokens.js';
@@ -31,11 +36,12 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
           "mappingRules",
           "pullConfig",
           active,
+          status,
           "authorName",
           "createdAt",
           "updatedAt"
         )
-        VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9, $10, $11)
+        VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9, $10, $11, $12)
         RETURNING id::text AS id
       `,
       [
@@ -47,6 +53,7 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
         this.stringifyJson(config.mappingRules),
         this.stringifyJson(config.pullConfig),
         config.active,
+        config.status,
         config.authorName,
         config.createdAt,
         config.updatedAt,
@@ -65,6 +72,7 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
       name: string;
       updatedAt: Date;
       active: boolean;
+      status: IntegrationRuntimeStatus;
       authorName: string;
     }>(
       `
@@ -73,6 +81,7 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
           name,
           "updatedAt" AS "updatedAt",
           active,
+          status,
           "authorName" AS "authorName"
         FROM integration_config
         WHERE "companyId" = $3
@@ -91,7 +100,8 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
         number: row.id,
         name: row.name,
         updatedAt: new Date(row.updatedAt),
-        status: row.active ? 'active' : 'inactive',
+        active: row.active,
+        status: row.status,
         authorName: row.authorName,
       })),
       hasMore,
@@ -160,6 +170,7 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
       mappingRules: unknown;
       pullConfig: PullConfig | null;
       active: boolean;
+      status: IntegrationRuntimeStatus;
       authorName: string;
       updatedAt: Date;
     }>(
@@ -173,6 +184,7 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
           "mappingRules" AS "mappingRules",
           "pullConfig" AS "pullConfig",
           active,
+          status,
           "authorName" AS "authorName",
           "updatedAt" AS "updatedAt"
         FROM integration_config
@@ -197,7 +209,8 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
       riskObjectModelId: row.riskObjectModelId,
       mappingRules: row.mappingRules,
       pullConfig: row.pullConfig,
-      status: row.active ? 'active' : 'inactive',
+      active: row.active,
+      status: row.status,
       authorName: row.authorName,
       updatedAt: new Date(row.updatedAt),
     };
@@ -223,6 +236,7 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
         mappingRules: unknown;
         pullConfig: PullConfig | null;
         active: boolean;
+        status: IntegrationRuntimeStatus;
         authorName: string;
         createdAt: Date;
         updatedAt: Date;
@@ -238,6 +252,7 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
             "mappingRules" AS "mappingRules",
             "pullConfig" AS "pullConfig",
             active,
+            status,
             "authorName" AS "authorName",
             "createdAt" AS "createdAt",
             "updatedAt" AS "updatedAt"
@@ -337,12 +352,12 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
     }
   }
 
-  async updateStatusById(
+  async updateActiveById(
     companyId: string,
     id: number,
-    status: 'active' | 'inactive',
+    active: boolean,
   ): Promise<Date | null> {
-    const active = status === 'active';
+    this.logger.log(`Updating integration active flag (companyId=${companyId}, id=${id}, active=${active})`);
 
     const result = await this.pool.query<{ updatedAt: Date }>(
       `
@@ -354,6 +369,66 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
         RETURNING "updatedAt" AS "updatedAt"
       `,
       [companyId, id, active],
+    );
+
+    const updatedRow = result.rows[0];
+    return updatedRow ? new Date(updatedRow.updatedAt) : null;
+  }
+
+  async listForProcessManager(): Promise<IntegrationConfigProcessManagerItem[]> {
+    this.logger.log('Loading integration configs for process manager synchronization');
+    const result = await this.pool.query<{
+      id: number;
+      companyId: string;
+      name: string;
+      endpointUrl: string;
+      integrationKind: 'PUSH' | 'PULL' | 'BROKER';
+      active: boolean;
+      status: IntegrationRuntimeStatus;
+    }>(
+      `
+        SELECT
+          id,
+          "companyId" AS "companyId",
+          name,
+          "endpointUrl" AS "endpointUrl",
+          "integrationKind" AS "integrationKind",
+          active,
+          status
+        FROM integration_config
+        ORDER BY id ASC
+      `,
+    );
+
+    return result.rows.map((row) => ({
+      id: row.id,
+      companyId: row.companyId,
+      name: row.name,
+      endpointUrl: row.endpointUrl,
+      integrationKind: row.integrationKind,
+      active: row.active,
+      status: row.status,
+    }));
+  }
+
+  async updateRuntimeStatusById(
+    companyId: string,
+    id: number,
+    status: IntegrationRuntimeStatus,
+  ): Promise<Date | null> {
+    this.logger.log(
+      `Updating integration runtime status (companyId=${companyId}, id=${id}, status=${status})`,
+    );
+    const result = await this.pool.query<{ updatedAt: Date }>(
+      `
+        UPDATE integration_config
+        SET
+          status = $3,
+          "updatedAt" = NOW()
+        WHERE "companyId" = $1 AND id = $2
+        RETURNING "updatedAt" AS "updatedAt"
+      `,
+      [companyId, id, status],
     );
 
     const updatedRow = result.rows[0];

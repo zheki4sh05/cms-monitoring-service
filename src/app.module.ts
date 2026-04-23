@@ -27,6 +27,7 @@ import type { UuidGenerator } from './core/shared/ports/uuid-generator.port.js';
 import { PostgresMigratorService } from './infrastructure/database/postgres/postgres-migrator.service.js';
 import { postgresPoolProvider } from './infrastructure/database/postgres/postgres.provider.js';
 import { PostgresPoolLifecycle } from './infrastructure/database/postgres/postgres-pool.lifecycle.js';
+import { IntegrationRuntimeProcessManagerService } from './infrastructure/background/integration-runtime-process-manager.service.js';
 import { CryptoUuidGenerator } from './infrastructure/identifiers/crypto-uuid.generator.js';
 import { PostgresIntegrationConfigRepository } from './infrastructure/persistence/postgres-integration-config.repository.js';
 import { PostgresRiskObjectRepository } from './infrastructure/persistence/postgres-risk-object.repository.js';
@@ -47,6 +48,7 @@ import { RiskObjectController } from './web/risk-object/risk-object.controller.j
     PostgresMigratorService,
     postgresPoolProvider,
     PostgresPoolLifecycle,
+    IntegrationRuntimeProcessManagerService,
     CryptoUuidGenerator,
     PostgresIntegrationConfigRepository,
     PostgresRiskObjectRepository,

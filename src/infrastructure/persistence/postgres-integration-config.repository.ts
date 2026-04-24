@@ -356,19 +356,23 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
     companyId: string,
     id: number,
     active: boolean,
+    changedByUserId: string,
   ): Promise<Date | null> {
-    this.logger.log(`Updating integration active flag (companyId=${companyId}, id=${id}, active=${active})`);
+    this.logger.log(
+      `Updating integration active flag (companyId=${companyId}, id=${id}, active=${active}, changedByUserId=${changedByUserId})`,
+    );
 
     const result = await this.pool.query<{ updatedAt: Date }>(
       `
         UPDATE integration_config
         SET
           active = $3,
+          "lastStatusChangedByUserId" = $4,
           "updatedAt" = NOW()
         WHERE "companyId" = $1 AND id = $2
         RETURNING "updatedAt" AS "updatedAt"
       `,
-      [companyId, id, active],
+      [companyId, id, active, changedByUserId],
     );
 
     const updatedRow = result.rows[0];
@@ -385,6 +389,7 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
       integrationKind: 'PUSH' | 'PULL' | 'BROKER';
       active: boolean;
       status: IntegrationRuntimeStatus;
+      lastStatusChangedByUserId: string | null;
     }>(
       `
         SELECT
@@ -394,7 +399,8 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
           "endpointUrl" AS "endpointUrl",
           "integrationKind" AS "integrationKind",
           active,
-          status
+          status,
+          "lastStatusChangedByUserId" AS "lastStatusChangedByUserId"
         FROM integration_config
         ORDER BY id ASC
       `,
@@ -408,6 +414,7 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
       integrationKind: row.integrationKind,
       active: row.active,
       status: row.status,
+      lastStatusChangedByUserId: row.lastStatusChangedByUserId,
     }));
   }
 

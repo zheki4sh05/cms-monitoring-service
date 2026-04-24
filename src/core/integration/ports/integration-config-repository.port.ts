@@ -72,6 +72,7 @@ export interface IntegrationConfigProcessManagerItem {
   integrationKind: IntegrationKind;
   active: boolean;
   status: IntegrationRuntimeStatus;
+  lastStatusChangedByUserId: string | null;
 }
 
 export interface IntegrationConfigRepository {
@@ -85,7 +86,12 @@ export interface IntegrationConfigRepository {
   ): Promise<IntegrationConfigHistoryPage>;
   getById(companyId: string, id: number): Promise<IntegrationConfigDetails | null>;
   updateById(input: UpdateIntegrationConfigInput): Promise<Date | null>;
-  updateActiveById(companyId: string, id: number, active: boolean): Promise<Date | null>;
+  updateActiveById(
+    companyId: string,
+    id: number,
+    active: boolean,
+    changedByUserId: string,
+  ): Promise<Date | null>;
   listForProcessManager(): Promise<IntegrationConfigProcessManagerItem[]>;
   updateRuntimeStatusById(
     companyId: string,

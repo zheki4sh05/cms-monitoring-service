@@ -391,13 +391,13 @@ export class IntegrationConfigController {
     }
   }
 
-  @ApiOperation({ summary: 'Отдельное изменение флага active интеграции' })
+  @ApiOperation({ summary: 'Отдельное изменение флага активности интеграции' })
   @ApiHeader({ name: 'CompanyId', required: true, description: 'ID компании' })
   @ApiParam({ name: 'id', required: true, example: 'ic-1' })
   @ApiBody({ type: PutIntegrationConfigStatusRequestDto })
   @ApiOkResponse({ type: PutIntegrationConfigStatusResponseDto })
   @ApiNotFoundResponse({ description: 'Интеграция не найдена' })
-  @ApiBadRequestResponse({ description: 'Некорректный id, CompanyId или active' })
+  @ApiBadRequestResponse({ description: 'Некорректный id, CompanyId или status' })
   @Put('integration-configs/:id/status')
   async putIntegrationConfigStatus(
     @Headers('companyid') companyIdHeader: string | undefined,
@@ -408,8 +408,10 @@ export class IntegrationConfigController {
     await this.assertIntegrationPermission(request, 'MANAGE_INTEGRATIONS');
     const companyId = this.parseRequiredHeader(companyIdHeader, 'CompanyId');
     const integrationConfigId = this.parseRequiredHeader(idParam, 'id');
+    const targetActive = body.status ?? body.active;
+    const changedByUserId = this.parseRequiredHeader(request?.authenticatedUser?.userId, 'userId');
     this.logger.log(
-      `PUT /integration-configs/:id/status started (companyId=${companyId}, id=${integrationConfigId}, active=${body.active})`,
+      `PUT /integration-configs/:id/status started (companyId=${companyId}, id=${integrationConfigId}, status=${body.status}, active=${body.active}, resolvedActive=${targetActive}, changedByUserId=${changedByUserId})`,
     );
 
     try {
@@ -417,7 +419,8 @@ export class IntegrationConfigController {
       const savedAt = await this.updateIntegrationConfigStatusUseCase.execute({
         companyId,
         integrationConfigId,
-        active: body.active,
+        active: targetActive as boolean,
+        changedByUserId,
       });
 
       if (!savedAt) {

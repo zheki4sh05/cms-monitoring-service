@@ -6,6 +6,7 @@ export interface UpdateIntegrationConfigStatusInput {
   companyId: string;
   integrationConfigId: string;
   active: boolean;
+  changedByUserId: string;
 }
 
 export class UpdateIntegrationConfigStatusUseCase {
@@ -28,10 +29,18 @@ export class UpdateIntegrationConfigStatusUseCase {
     if (typeof input.active !== 'boolean') {
       throw new DomainValidationError('active must be boolean.');
     }
+    if (!input.changedByUserId?.trim()) {
+      throw new DomainValidationError('changedByUserId is required.');
+    }
 
     const numericId = this.parseIntegrationConfigId(input.integrationConfigId.trim());
     this.logger.log(`Validation passed, updating active flag for integration id=${numericId}`);
-    return this.integrationConfigRepository.updateActiveById(input.companyId.trim(), numericId, input.active);
+    return this.integrationConfigRepository.updateActiveById(
+      input.companyId.trim(),
+      numericId,
+      input.active,
+      input.changedByUserId.trim(),
+    );
   }
 
   private parseIntegrationConfigId(value: string): number {

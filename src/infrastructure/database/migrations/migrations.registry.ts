@@ -13,6 +13,7 @@ import { createIntegrationHistoryTableMigration } from './202604132100-create-in
 import { addUuidColumnToRiskObjectMigration } from './202604132200-add-uuid-column-to-risk-object.migration.js';
 import { addPullConfigToIntegrationConfigMigration } from './202604211200-add-pull-config-to-integration-config.migration.js';
 import { addRuntimeStatusToIntegrationConfigMigration } from './202604231000-add-runtime-status-to-integration-config.migration.js';
+import { addLastStatusChangedByUserToIntegrationConfigMigration } from './202604242230-add-last-status-changed-by-user-to-integration-config.migration.js';
 import type { Migration } from './migration.interface.js';
 
 export const MIGRATIONS: Migration[] = [
@@ -30,5 +31,6 @@ export const MIGRATIONS: Migration[] = [
   createIntegrationHistoryTableMigration,
   addPullConfigToIntegrationConfigMigration,
   addRuntimeStatusToIntegrationConfigMigration,
+  addLastStatusChangedByUserToIntegrationConfigMigration,
   addUuidColumnToRiskObjectMigration,
 ];

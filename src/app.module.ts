@@ -29,6 +29,7 @@ import { postgresPoolProvider } from './infrastructure/database/postgres/postgre
 import { PostgresPoolLifecycle } from './infrastructure/database/postgres/postgres-pool.lifecycle.js';
 import { IntegrationRuntimeProcessManagerService } from './infrastructure/background/integration-runtime-process-manager.service.js';
 import { CryptoUuidGenerator } from './infrastructure/identifiers/crypto-uuid.generator.js';
+import { IntegrationStatusEventsPublisher } from './infrastructure/messaging/integration-status-events.publisher.js';
 import { PostgresIntegrationConfigRepository } from './infrastructure/persistence/postgres-integration-config.repository.js';
 import { PostgresRiskObjectRepository } from './infrastructure/persistence/postgres-risk-object.repository.js';
 import { JwtAccessTokenValidator } from './infrastructure/security/jwt-access-token.validator.js';
@@ -49,6 +50,7 @@ import { RiskObjectController } from './web/risk-object/risk-object.controller.j
     postgresPoolProvider,
     PostgresPoolLifecycle,
     IntegrationRuntimeProcessManagerService,
+    IntegrationStatusEventsPublisher,
     CryptoUuidGenerator,
     PostgresIntegrationConfigRepository,
     PostgresRiskObjectRepository,

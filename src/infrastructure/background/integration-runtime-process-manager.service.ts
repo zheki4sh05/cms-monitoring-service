@@ -4,17 +4,19 @@ import type {
   IntegrationConfigRepository,
 } from '../../core/integration/ports/integration-config-repository.port.js';
 import { INTEGRATION_CONFIG_REPOSITORY } from '../../core/integration/ports/integration-config-repository.port.js';
+import { IntegrationStatusEventsPublisher } from '../messaging/integration-status-events.publisher.js';
 
 @Injectable()
 export class IntegrationRuntimeProcessManagerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(IntegrationRuntimeProcessManagerService.name);
-  private readonly syncIntervalMs = 10 * 60 * 1000;
+  private readonly syncIntervalMs = 1 * 60 * 1000;
   private intervalRef: NodeJS.Timeout | null = null;
   private syncInProgress = false;
 
   constructor(
     @Inject(INTEGRATION_CONFIG_REPOSITORY)
     private readonly integrationConfigRepository: IntegrationConfigRepository,
+    private readonly integrationStatusEventsPublisher: IntegrationStatusEventsPublisher,
   ) {}
 
   onModuleInit(): void {
@@ -144,6 +146,14 @@ export class IntegrationRuntimeProcessManagerService implements OnModuleInit, On
       `Updating runtime status (companyId=${config.companyId}, id=${config.id}, from=${config.status}, to=${nextStatus})`,
     );
     await this.integrationConfigRepository.updateRuntimeStatusById(config.companyId, config.id, nextStatus);
+    await this.integrationStatusEventsPublisher.publishStatusChanged(
+      config.companyId,
+      nextStatus,
+      config.lastStatusChangedByUserId ?? undefined,
+    );
+    this.logger.log(
+      `Kafka ws event sent for integration status change (companyId=${config.companyId}, id=${config.id}, status=${nextStatus}, userId=${config.lastStatusChangedByUserId ?? 'fallback'})`,
+    );
     config.status = nextStatus;
   }
 

@@ -64,7 +64,7 @@ export class OutboxProcessingService {
     await this.persistSuccess(integration.id, integration.companyId, integration.riskObjectId, data, processDate);
   }
 
-  async processRetryItem(retryItemId: number, integrationId: number, data: unknown, processDate: Date): Promise<void> {
+  async processRetryItem(retryItemId: string, integrationId: number, data: unknown, processDate: Date): Promise<void> {
     const integration = await this.integrationConfigRepository.getByIdForOutboxProcessing(integrationId);
     if (!integration || !integration.active) {
       return;
@@ -92,13 +92,14 @@ export class OutboxProcessingService {
     const monitoringEntityId = await this.monitoringResultRepository.save({
       data,
       riskObjectId,
+      integrationId,
       processDate,
     });
 
     await this.eventsPublisher.publishRiskMonitoringEvent({
       integrationId: String(integrationId),
       companyId,
-      monitoring_entity: String(monitoringEntityId),
+      monitoring_entity: monitoringEntityId,
       start_process: processDate.toISOString(),
     });
 

@@ -12,6 +12,7 @@ import { GetIntegrationConfigChangeHistoryUseCase } from './core/integration/use
 import { GetIntegrationConfigsUseCase } from './core/integration/use-cases/get-integration-configs.use-case.js';
 import { UpdateIntegrationConfigByIdUseCase } from './core/integration/use-cases/update-integration-config-by-id.use-case.js';
 import { UpdateIntegrationConfigStatusUseCase } from './core/integration/use-cases/update-integration-config-status.use-case.js';
+import { TakeMonitoringResultByIdUseCase } from './core/monitoring-result/use-cases/take-monitoring-result-by-id.use-case.js';
 import { CreateRiskObjectUseCase } from './core/risk-object/use-cases/create-risk-object.use-case.js';
 import { GetRiskObjectChangeHistoryByIdUseCase } from './core/risk-object/use-cases/get-risk-object-change-history-by-id.use-case.js';
 import { GetRiskObjectChangeHistoryUseCase } from './core/risk-object/use-cases/get-risk-object-change-history.use-case.js';
@@ -44,6 +45,7 @@ import { JwtAccessTokenValidator } from './infrastructure/security/jwt-access-to
 import { CmsAuthUserPermissionCheckerService } from './infrastructure/security/cms-auth-user-permission-checker.service.js';
 import { AuthenticationGuard } from './web/auth/authentication.guard.js';
 import { IntegrationConfigController } from './web/integration/integration-config.controller.js';
+import { MonitoringResultController } from './web/monitoring-result/monitoring-result.controller.js';
 import { RiskObjectController } from './web/risk-object/risk-object.controller.js';
 
 @Module({
@@ -52,7 +54,7 @@ import { RiskObjectController } from './web/risk-object/risk-object.controller.j
       isGlobal: true, // чтобы ConfigService был доступен везде
     }),
   ],
-  controllers: [RiskObjectController, IntegrationConfigController],
+  controllers: [RiskObjectController, IntegrationConfigController, MonitoringResultController],
   providers: [
     PostgresMigratorService,
     postgresPoolProvider,
@@ -144,6 +146,7 @@ import { RiskObjectController } from './web/risk-object/risk-object.controller.j
       useFactory: (integrationConfigRepository: IntegrationConfigRepository) =>
         new UpdateIntegrationConfigStatusUseCase(integrationConfigRepository),
     },
+    TakeMonitoringResultByIdUseCase,
     {
       provide: GetRiskObjectChangeHistoryUseCase,
       inject: [RISK_OBJECT_REPOSITORY],

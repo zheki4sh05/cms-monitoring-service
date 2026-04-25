@@ -9,6 +9,7 @@ export const createMonitoringResultTableMigration: Migration = {
         id BIGSERIAL PRIMARY KEY,
         data JSONB NOT NULL,
         "riskObjectId" VARCHAR(64) NOT NULL REFERENCES risk_object(id) ON DELETE RESTRICT,
+        "integrationId" BIGINT NOT NULL REFERENCES integration_config(id) ON DELETE CASCADE,
         process_date TIMESTAMP NOT NULL
       )
     `);
@@ -16,6 +17,11 @@ export const createMonitoringResultTableMigration: Migration = {
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_monitoring_result_risk_object_process_date
       ON monitoring_result ("riskObjectId", process_date DESC)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_monitoring_result_integration_process_date
+      ON monitoring_result ("integrationId", process_date DESC)
     `);
   },
 };

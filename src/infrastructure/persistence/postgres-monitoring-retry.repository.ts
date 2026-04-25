@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
 import { PG_POOL } from '../database/postgres/postgres.tokens.js';
 
@@ -10,7 +11,7 @@ export interface CreateMonitoringRetryInput {
 }
 
 export interface MonitoringRetryItem {
-  id: number;
+  id: string;
   data: unknown;
   riskObjectId: string;
   integrationId: number;
@@ -21,27 +22,34 @@ export interface MonitoringRetryItem {
 export class PostgresMonitoringRetryRepository {
   constructor(@Inject(PG_POOL) private readonly pool: Pool) {}
 
-  async save(input: CreateMonitoringRetryInput): Promise<number> {
+  async save(input: CreateMonitoringRetryInput): Promise<string> {
+    const generatedId = randomUUID();
     const result = await this.pool.query<{ id: string }>(
       `
         INSERT INTO monitoring_retry (
+          id,
           data,
           "riskObjectId",
           "integrationId",
           process_date
         )
-        VALUES ($1::jsonb, $2, $3, $4)
+        VALUES ($1::uuid, $2::jsonb, $3, $4, $5)
         RETURNING id::text AS id
       `,
-      [JSON.stringify(input.data ?? null), input.riskObjectId, input.integrationId, input.processDate],
+      [generatedId, JSON.stringify(input.data ?? null), input.riskObjectId, input.integrationId, input.processDate],
     );
 
-    return Number(result.rows[0]?.id ?? '0');
+    const id = result.rows[0]?.id;
+    if (!id) {
+      throw new Error('Failed to persist monitoring_retry: id was not returned by database.');
+    }
+
+    return id;
   }
 
   async listPending(limit: number): Promise<MonitoringRetryItem[]> {
     const result = await this.pool.query<{
-      id: number;
+      id: string;
       data: unknown;
       riskObjectId: string;
       integrationId: number;
@@ -49,7 +57,7 @@ export class PostgresMonitoringRetryRepository {
     }>(
       `
         SELECT
-          id,
+          id::text AS id,
           data,
           "riskObjectId" AS "riskObjectId",
           "integrationId" AS "integrationId",
@@ -70,7 +78,7 @@ export class PostgresMonitoringRetryRepository {
     }));
   }
 
-  async deleteById(id: number): Promise<void> {
+  async deleteById(id: string): Promise<void> {
     await this.pool.query('DELETE FROM monitoring_retry WHERE id = $1', [id]);
   }
 }

@@ -18,6 +18,9 @@ import { addInvocationMetricsToIntegrationConfigMigration } from './202604251510
 import { createMonitoringResultTableMigration } from './202604251630-create-monitoring-result-table.migration.js';
 import { addRiskObjectAuthorAndLastModifiedByMigration } from './202604251650-add-risk-object-author-and-last-modified-by.migration.js';
 import { createMonitoringRetryTableMigration } from './202604251730-create-monitoring-retry-table.migration.js';
+import { addIntegrationIdToMonitoringResultMigration } from './202604251740-add-integration-id-to-monitoring-result.migration.js';
+import { changeMonitoringIdsToUuidMigration } from './202604251800-change-monitoring-ids-to-uuid.migration.js';
+import { enforceMonitoringUuidPrimaryKeysMigration } from './202604251820-enforce-monitoring-uuid-primary-keys.migration.js';
 import type { Migration } from './migration.interface.js';
 
 export const MIGRATIONS: Migration[] = [
@@ -40,5 +43,8 @@ export const MIGRATIONS: Migration[] = [
   createMonitoringResultTableMigration,
   addRiskObjectAuthorAndLastModifiedByMigration,
   createMonitoringRetryTableMigration,
+  addIntegrationIdToMonitoringResultMigration,
+  changeMonitoringIdsToUuidMigration,
+  enforceMonitoringUuidPrimaryKeysMigration,
   addUuidColumnToRiskObjectMigration,
 ];

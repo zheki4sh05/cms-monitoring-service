@@ -30,11 +30,15 @@ import { PostgresPoolLifecycle } from './infrastructure/database/postgres/postgr
 import { IntegrationRuntimeProcessManagerService } from './infrastructure/background/integration-runtime-process-manager.service.js';
 import { IntegrationInvocationEventBusService } from './infrastructure/background/integration-invocation-event-bus.service.js';
 import { OutboxManagerService } from './infrastructure/background/outbox-manager.service.js';
+import { OutboxProcessingService } from './infrastructure/background/outbox-processing.service.js';
 import { OutboxQueueService } from './infrastructure/background/outbox-queue.service.js';
+import { OutboxRetryManagerService } from './infrastructure/background/outbox-retry-manager.service.js';
 import { PullIntegrationBackgroundProcessService } from './infrastructure/background/pull-integration-background-process.service.js';
 import { CryptoUuidGenerator } from './infrastructure/identifiers/crypto-uuid.generator.js';
 import { IntegrationStatusEventsPublisher } from './infrastructure/messaging/integration-status-events.publisher.js';
 import { PostgresIntegrationConfigRepository } from './infrastructure/persistence/postgres-integration-config.repository.js';
+import { PostgresMonitoringResultRepository } from './infrastructure/persistence/postgres-monitoring-result.repository.js';
+import { PostgresMonitoringRetryRepository } from './infrastructure/persistence/postgres-monitoring-retry.repository.js';
 import { PostgresRiskObjectRepository } from './infrastructure/persistence/postgres-risk-object.repository.js';
 import { JwtAccessTokenValidator } from './infrastructure/security/jwt-access-token.validator.js';
 import { CmsAuthUserPermissionCheckerService } from './infrastructure/security/cms-auth-user-permission-checker.service.js';
@@ -58,9 +62,13 @@ import { RiskObjectController } from './web/risk-object/risk-object.controller.j
     PullIntegrationBackgroundProcessService,
     OutboxQueueService,
     OutboxManagerService,
+    OutboxRetryManagerService,
+    OutboxProcessingService,
     IntegrationStatusEventsPublisher,
     CryptoUuidGenerator,
     PostgresIntegrationConfigRepository,
+    PostgresMonitoringResultRepository,
+    PostgresMonitoringRetryRepository,
     PostgresRiskObjectRepository,
     JwtAccessTokenValidator,
     CmsAuthUserPermissionCheckerService,

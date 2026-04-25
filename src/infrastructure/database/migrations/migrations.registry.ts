@@ -15,6 +15,9 @@ import { addPullConfigToIntegrationConfigMigration } from './202604211200-add-pu
 import { addRuntimeStatusToIntegrationConfigMigration } from './202604231000-add-runtime-status-to-integration-config.migration.js';
 import { addLastStatusChangedByUserToIntegrationConfigMigration } from './202604242230-add-last-status-changed-by-user-to-integration-config.migration.js';
 import { addInvocationMetricsToIntegrationConfigMigration } from './202604251510-add-invocation-metrics-to-integration-config.migration.js';
+import { createMonitoringResultTableMigration } from './202604251630-create-monitoring-result-table.migration.js';
+import { addRiskObjectAuthorAndLastModifiedByMigration } from './202604251650-add-risk-object-author-and-last-modified-by.migration.js';
+import { createMonitoringRetryTableMigration } from './202604251730-create-monitoring-retry-table.migration.js';
 import type { Migration } from './migration.interface.js';
 
 export const MIGRATIONS: Migration[] = [
@@ -34,5 +37,8 @@ export const MIGRATIONS: Migration[] = [
   addRuntimeStatusToIntegrationConfigMigration,
   addLastStatusChangedByUserToIntegrationConfigMigration,
   addInvocationMetricsToIntegrationConfigMigration,
+  createMonitoringResultTableMigration,
+  addRiskObjectAuthorAndLastModifiedByMigration,
+  createMonitoringRetryTableMigration,
   addUuidColumnToRiskObjectMigration,
 ];

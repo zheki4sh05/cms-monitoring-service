@@ -137,12 +137,9 @@ export class PullIntegrationBackgroundProcessService implements OnModuleDestroy 
     const responsePayload = await this.executeMockHttpRequest(config, requestConfig);
 
     this.outboxQueueService.enqueue({
-      companyId: config.companyId,
       integrationId: config.id,
-      integrationName: config.name,
-      pullConfig: config.pullConfig,
-      requestConfig,
-      createdAt: new Date(),
+      data: responsePayload.body,
+      processDate: new Date(),
     });
 
     this.logger.log(

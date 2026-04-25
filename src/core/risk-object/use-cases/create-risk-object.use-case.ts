@@ -5,6 +5,7 @@ import { DomainValidationError } from '../../shared/errors/domain-validation.err
 
 export interface CreateRiskObjectInput {
   companyId: string;
+  authorId: string;
   name: string;
   definition: unknown;
 }
@@ -24,6 +25,10 @@ export class CreateRiskObjectUseCase {
       throw new DomainValidationError('Risk object name is required.');
     }
 
+    if (!input.authorId?.trim()) {
+      throw new DomainValidationError('authorId is required.');
+    }
+
     if (!input.definition || typeof input.definition !== 'object' || Array.isArray(input.definition)) {
       throw new DomainValidationError('Risk object definition must be a JSON object.');
     }
@@ -33,6 +38,8 @@ export class CreateRiskObjectUseCase {
     const riskObject: RiskObject = {
       id: this.uuidGenerator.generate(),
       companyId: input.companyId.trim(),
+      authorId: input.authorId.trim(),
+      lastModifiedBy: input.authorId.trim(),
       name: input.name.trim(),
       definition: input.definition as Record<string, unknown>,
       createdAt: now,

@@ -100,6 +100,9 @@ export interface IntegrationConfigRepository {
     q?: string,
   ): Promise<IntegrationConfigHistoryPage>;
   getById(companyId: string, id: number): Promise<IntegrationConfigDetails | null>;
+  getByIdForOutboxProcessing(
+    id: number,
+  ): Promise<{ id: number; companyId: string; riskObjectId: string; active: boolean } | null>;
   updateById(input: UpdateIntegrationConfigInput): Promise<Date | null>;
   updateActiveById(
     companyId: string,

@@ -73,12 +73,15 @@ export class RiskObjectController {
   async createRiskObject(
     @Headers('companyid') companyIdHeader: string | undefined,
     @Body() body: CreateRiskObjectRequestDto,
+    @Req() request: RequestWithAuthUser,
   ): Promise<CreateRiskObjectResponseDto> {
     const companyId = this.parseRequiredHeader(companyIdHeader, 'CompanyId');
+    const authorId = this.parseRequiredHeader(request.authenticatedUser?.userId, 'userId');
 
     try {
       const riskObject = await this.createRiskObjectUseCase.execute({
         companyId,
+        authorId,
         name: body.name,
         definition: body.definition,
       });
@@ -268,11 +271,13 @@ export class RiskObjectController {
     const companyId = this.parseRequiredHeader(companyIdHeader, 'CompanyId');
     const riskObjectId = this.parseRequiredHeader(id, 'id');
     const authorName = request.authenticatedUser?.username?.trim() || 'Unknown';
+    const lastModifiedBy = this.parseRequiredHeader(request.authenticatedUser?.userId, 'userId');
 
     try {
       const updateRequest: {
         companyId: string;
         id: string;
+        lastModifiedBy: string;
         name: string;
         definition: Record<string, unknown>;
         changeComment: string;
@@ -280,6 +285,7 @@ export class RiskObjectController {
       } = {
         companyId,
         id: riskObjectId,
+        lastModifiedBy,
         name: body.name,
         definition: body.definition,
         changeComment: body.changeComment,

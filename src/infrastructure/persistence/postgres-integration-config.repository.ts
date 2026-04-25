@@ -235,6 +235,41 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
     };
   }
 
+  async getByIdForOutboxProcessing(
+    id: number,
+  ): Promise<{ id: number; companyId: string; riskObjectId: string; active: boolean } | null> {
+    const result = await this.pool.query<{
+      id: number;
+      companyId: string;
+      riskObjectId: string;
+      active: boolean;
+    }>(
+      `
+        SELECT
+          id,
+          "companyId" AS "companyId",
+          "riskObjectId" AS "riskObjectId",
+          active
+        FROM integration_config
+        WHERE id = $1
+        LIMIT 1
+      `,
+      [id],
+    );
+
+    const row = result.rows[0];
+    if (!row) {
+      return null;
+    }
+
+    return {
+      id: row.id,
+      companyId: row.companyId,
+      riskObjectId: row.riskObjectId,
+      active: row.active,
+    };
+  }
+
   async updateById(input: UpdateIntegrationConfigInput): Promise<Date | null> {
     this.logger.log(
       `Updating integration config in DB transaction (companyId=${input.companyId}, id=${input.id}, hasPullConfig=${input.pullConfig !== undefined})`,

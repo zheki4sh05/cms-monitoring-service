@@ -59,6 +59,7 @@ export interface RiskObjectDetails {
 export interface UpdateRiskObjectInput {
   companyId: string;
   id: string;
+  lastModifiedBy: string;
   name: string;
   definition: Record<string, unknown>;
   changeComment: string;

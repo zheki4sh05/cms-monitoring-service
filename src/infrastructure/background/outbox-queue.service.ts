@@ -1,18 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { PullConfig } from '../../core/integration/domain/integration-config.js';
-
 export interface OutboxQueueItem {
-  companyId: string;
   integrationId: number;
-  integrationName: string;
-  pullConfig: PullConfig | null;
-  requestConfig: {
-    method: string;
-    url: string;
-    headers: Record<string, string>;
-    body: unknown;
-  };
-  createdAt: Date;
+  data: unknown;
+  processDate: Date;
 }
 
 @Injectable()
@@ -23,7 +13,7 @@ export class OutboxQueueService {
   enqueue(item: OutboxQueueItem): void {
     this.queue.push(item);
     this.logger.log(
-      `OUTBOX_QUEUE enqueue (companyId=${item.companyId}, integrationId=${item.integrationId}, queueSize=${this.queue.length})`,
+      `OUTBOX_QUEUE enqueue (integrationId=${item.integrationId}, queueSize=${this.queue.length})`,
     );
   }
 

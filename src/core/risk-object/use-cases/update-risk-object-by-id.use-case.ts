@@ -4,6 +4,7 @@ import type { RiskObjectRepository } from '../ports/risk-object-repository.port.
 export interface UpdateRiskObjectByIdInput {
   companyId: string;
   id: string;
+  lastModifiedBy: string;
   name: string;
   definition: unknown;
   changeComment: string;
@@ -38,9 +39,14 @@ export class UpdateRiskObjectByIdUseCase {
       throw new DomainValidationError('authorName is required.');
     }
 
+    if (!input.lastModifiedBy?.trim()) {
+      throw new DomainValidationError('lastModifiedBy is required.');
+    }
+
     const updatePayload: {
       companyId: string;
       id: string;
+      lastModifiedBy: string;
       name: string;
       definition: Record<string, unknown>;
       changeComment: string;
@@ -48,6 +54,7 @@ export class UpdateRiskObjectByIdUseCase {
     } = {
       companyId: input.companyId.trim(),
       id: input.id.trim(),
+      lastModifiedBy: input.lastModifiedBy.trim(),
       name: input.name.trim(),
       definition: input.definition as Record<string, unknown>,
       changeComment: input.changeComment.trim(),

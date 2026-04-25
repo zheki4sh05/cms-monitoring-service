@@ -27,13 +27,27 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
 
       await client.query(
         `
-          INSERT INTO risk_object (id, "companyId", code, name, definition, "createdAt", "updatedAt", active, uuid)
-          VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9::uuid)
+          INSERT INTO risk_object (
+            id,
+            "companyId",
+            code,
+            "authorId",
+            "lastModifiedBy",
+            name,
+            definition,
+            "createdAt",
+            "updatedAt",
+            active,
+            uuid
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11::uuid)
         `,
         [
           riskObject.id,
           riskObject.companyId,
           code,
+          riskObject.authorId,
+          riskObject.lastModifiedBy,
           riskObject.name,
           JSON.stringify(riskObject.definition),
           riskObject.createdAt,
@@ -310,11 +324,12 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
           SET
             name = $3,
             definition = $4::jsonb,
+            "lastModifiedBy" = $5,
             "updatedAt" = NOW()
           WHERE "companyId" = $1 AND id = $2
           RETURNING "updatedAt" AS "updatedAt"
         `,
-        [input.companyId, input.id, input.name, JSON.stringify(input.definition)],
+        [input.companyId, input.id, input.name, JSON.stringify(input.definition), input.lastModifiedBy],
       );
 
       await client.query('COMMIT');
@@ -345,6 +360,42 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
 
     const updatedRow = result.rows[0];
     return updatedRow ? new Date(updatedRow.updatedAt) : null;
+  }
+
+  async getByIdForOutboxProcessing(
+    companyId: string,
+    id: string,
+  ): Promise<{ id: string; active: boolean; authorId: string; lastModifiedBy: string | null } | null> {
+    const result = await this.pool.query<{
+      id: string;
+      active: boolean;
+      authorId: string;
+      lastModifiedBy: string | null;
+    }>(
+      `
+        SELECT
+          id,
+          active,
+          "authorId" AS "authorId",
+          "lastModifiedBy" AS "lastModifiedBy"
+        FROM risk_object
+        WHERE "companyId" = $1 AND id = $2
+        LIMIT 1
+      `,
+      [companyId, id],
+    );
+
+    const row = result.rows[0];
+    if (!row) {
+      return null;
+    }
+
+    return {
+      id: row.id,
+      active: row.active,
+      authorId: row.authorId,
+      lastModifiedBy: row.lastModifiedBy,
+    };
   }
 
   private async getNextCompanyScopedCode(client: PoolClient, companyId: string): Promise<string> {

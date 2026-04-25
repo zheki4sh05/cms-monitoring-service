@@ -6,7 +6,7 @@ import type { IntegrationRuntimeStatus } from '../../core/integration/domain/int
 interface IntegrationStatusEventPayload {
   userId: string;
   companyId: string;
-  entityId: string;
+  entityId: string | null;
   valueType: 'text';
   moduleType: 'integration_status';
   clientType: 'admin';
@@ -18,7 +18,7 @@ interface IntegrationStatusEventPayload {
 interface IntegrationInvocationsEventPayload {
   userId: string;
   companyId: string;
-  entityId: string;
+  entityId: string | null;
   valueType: 'text';
   moduleType: 'integration_invocations';
   clientType: 'admin';
@@ -28,10 +28,30 @@ interface IntegrationInvocationsEventPayload {
   };
 }
 
+interface RiskMonitoringEventPayload {
+  integrationId: string;
+  companyId: string;
+  monitoring_entity: string;
+  start_process: string;
+}
+
+interface IntegrationEventNotificationPayload {
+  userId: string;
+  companyId: string;
+  valueType: 'text';
+  entityId: null;
+  moduleType: 'integration-event';
+  clientType: 'admin';
+  data: {
+    message: string;
+  };
+}
+
 @Injectable()
 export class IntegrationStatusEventsPublisher implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(IntegrationStatusEventsPublisher.name);
   private readonly topic: string;
+  private readonly riskTopic: string;
   private readonly fallbackUserId: string;
   private readonly kafkaBrokers: string[];
   private producer: Producer | null = null;
@@ -39,8 +59,77 @@ export class IntegrationStatusEventsPublisher implements OnModuleInit, OnModuleD
 
   constructor(private readonly configService: ConfigService) {
     this.topic = this.configService.get<string>('KAFKA_WS_EVENTS_TOPIC', 'ws_events');
+    this.riskTopic = this.configService.get<string>('KAFKA_RISK_TOPIC', 'risk_topic');
     this.fallbackUserId = this.configService.get<string>('KAFKA_WS_EVENTS_USER_ID', 'integration-manager');
     this.kafkaBrokers = this.parseCsv(this.configService.get<string>('KAFKA_BROKERS'));
+  }
+
+  async publishRiskMonitoringEvent(payload: RiskMonitoringEventPayload): Promise<void> {
+    if (!this.connected || !this.producer) {
+      this.logger.warn(
+        `Kafka producer is not connected, skipping risk monitoring event (integrationId=${payload.integrationId}, companyId=${payload.companyId})`,
+      );
+      return;
+    }
+
+    try {
+      await this.producer.send({
+        topic: this.riskTopic,
+        messages: [
+          {
+            key: payload.companyId,
+            value: JSON.stringify(payload),
+          },
+        ],
+      });
+      this.logger.log(
+        `Kafka risk monitoring event published (topic=${this.riskTopic}, integrationId=${payload.integrationId}, companyId=${payload.companyId}, monitoringEntity=${payload.monitoring_entity})`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to publish risk monitoring event (integrationId=${payload.integrationId}, companyId=${payload.companyId}): ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+    }
+  }
+
+  async publishDisabledRiskObjectEvent(userId: string, companyId: string, riskObjectId: string): Promise<void> {
+    if (!this.connected || !this.producer) {
+      this.logger.warn(
+        `Kafka producer is not connected, skipping disabled risk object event (companyId=${companyId}, riskObjectId=${riskObjectId}, userId=${userId})`,
+      );
+      return;
+    }
+
+    const message: IntegrationEventNotificationPayload = {
+      userId,
+      companyId,
+      valueType: 'text',
+      entityId: null,
+      moduleType: 'integration-event',
+      clientType: 'admin',
+      data: {
+        message: `DISABLED_RISK_OBJECT: ${riskObjectId}`,
+      },
+    };
+
+    try {
+      await this.producer.send({
+        topic: this.topic,
+        messages: [
+          {
+            key: companyId,
+            value: JSON.stringify(message),
+          },
+        ],
+      });
+      this.logger.log(
+        `Kafka disabled risk object event published (topic=${this.topic}, companyId=${companyId}, riskObjectId=${riskObjectId}, userId=${userId})`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to publish disabled risk object event (companyId=${companyId}, riskObjectId=${riskObjectId}, userId=${userId}): ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+    }
   }
 
   async onModuleInit(): Promise<void> {

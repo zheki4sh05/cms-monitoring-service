@@ -70,6 +70,7 @@ export interface IntegrationConfigProcessManagerItem {
   name: string;
   endpointUrl: string;
   integrationKind: IntegrationKind;
+  pullConfig: PullConfig | null;
   active: boolean;
   status: IntegrationRuntimeStatus;
   lastStatusChangedByUserId: string | null;

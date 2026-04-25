@@ -6,6 +6,7 @@ import type { IntegrationRuntimeStatus } from '../../core/integration/domain/int
 interface IntegrationStatusEventPayload {
   userId: string;
   companyId: string;
+  entityId: string;
   valueType: 'text';
   moduleType: 'integration_status';
   clientType: 'admin';
@@ -73,6 +74,7 @@ export class IntegrationStatusEventsPublisher implements OnModuleInit, OnModuleD
 
   async publishStatusChanged(
     companyId: string,
+    entityId: string,
     status: IntegrationRuntimeStatus,
     userId?: string,
   ): Promise<void> {
@@ -86,6 +88,7 @@ export class IntegrationStatusEventsPublisher implements OnModuleInit, OnModuleD
     const message: IntegrationStatusEventPayload = {
       userId: userId?.trim() || this.fallbackUserId,
       companyId,
+      entityId,
       valueType: 'text',
       moduleType: 'integration_status',
       clientType: 'admin',
@@ -105,11 +108,11 @@ export class IntegrationStatusEventsPublisher implements OnModuleInit, OnModuleD
         ],
       });
       this.logger.log(
-        `Kafka integration status event published (topic=${this.topic}, companyId=${companyId}, status=${status})`,
+        `Kafka integration status event published (topic=${this.topic}, companyId=${companyId}, entityId=${entityId}, status=${status})`,
       );
     } catch (error) {
       this.logger.error(
-        `Failed to publish integration status event (companyId=${companyId}, status=${status}): ${error instanceof Error ? error.message : 'Unknown error'}`,
+        `Failed to publish integration status event (companyId=${companyId}, entityId=${entityId}, status=${status}): ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }
   }

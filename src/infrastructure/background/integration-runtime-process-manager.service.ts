@@ -5,6 +5,7 @@ import type {
 } from '../../core/integration/ports/integration-config-repository.port.js';
 import { INTEGRATION_CONFIG_REPOSITORY } from '../../core/integration/ports/integration-config-repository.port.js';
 import { IntegrationStatusEventsPublisher } from '../messaging/integration-status-events.publisher.js';
+import { PushIntegrationBackgroundProcessService } from './push-integration-background-process.service.js';
 
 @Injectable()
 export class IntegrationRuntimeProcessManagerService implements OnModuleInit, OnModuleDestroy {
@@ -17,6 +18,7 @@ export class IntegrationRuntimeProcessManagerService implements OnModuleInit, On
     @Inject(INTEGRATION_CONFIG_REPOSITORY)
     private readonly integrationConfigRepository: IntegrationConfigRepository,
     private readonly integrationStatusEventsPublisher: IntegrationStatusEventsPublisher,
+    private readonly pushIntegrationBackgroundProcessService: PushIntegrationBackgroundProcessService,
   ) {}
 
   onModuleInit(): void {
@@ -148,6 +150,7 @@ export class IntegrationRuntimeProcessManagerService implements OnModuleInit, On
     await this.integrationConfigRepository.updateRuntimeStatusById(config.companyId, config.id, nextStatus);
     await this.integrationStatusEventsPublisher.publishStatusChanged(
       config.companyId,
+      String(config.id),
       nextStatus,
       config.lastStatusChangedByUserId ?? undefined,
     );
@@ -161,8 +164,17 @@ export class IntegrationRuntimeProcessManagerService implements OnModuleInit, On
     this.logger.log(
       `Starter enqueue requested for integration (companyId=${config.companyId}, id=${config.id}, name=${config.name})`,
     );
-    this.logger.log(
-      `Starter payload prepared (companyId=${config.companyId}, id=${config.id}, endpointUrl=${config.endpointUrl}, integrationKind=${config.integrationKind})`,
+
+    if (config.integrationKind === 'PUSH') {
+      this.logger.log(
+        `Starting PUSH_INTEGRATION_BACKGROUND_PROCESS (companyId=${config.companyId}, id=${config.id}, endpointUrl=${config.endpointUrl})`,
+      );
+      await this.pushIntegrationBackgroundProcessService.run(config);
+      return;
+    }
+
+    this.logger.warn(
+      `Background process is not configured for integration kind=${config.integrationKind} (companyId=${config.companyId}, id=${config.id})`,
     );
   }
 

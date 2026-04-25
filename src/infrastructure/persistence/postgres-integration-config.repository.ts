@@ -387,6 +387,7 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
       name: string;
       endpointUrl: string;
       integrationKind: 'PUSH' | 'PULL' | 'BROKER';
+      pullConfig: PullConfig | null;
       active: boolean;
       status: IntegrationRuntimeStatus;
       lastStatusChangedByUserId: string | null;
@@ -398,6 +399,7 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
           name,
           "endpointUrl" AS "endpointUrl",
           "integrationKind" AS "integrationKind",
+          "pullConfig" AS "pullConfig",
           active,
           status,
           "lastStatusChangedByUserId" AS "lastStatusChangedByUserId"
@@ -412,6 +414,7 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
       name: row.name,
       endpointUrl: row.endpointUrl,
       integrationKind: row.integrationKind,
+      pullConfig: row.pullConfig,
       active: row.active,
       status: row.status,
       lastStatusChangedByUserId: row.lastStatusChangedByUserId,

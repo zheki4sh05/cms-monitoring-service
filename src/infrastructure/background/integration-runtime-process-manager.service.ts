@@ -1,16 +1,22 @@
 import { Inject, Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type {
+  IntegrationInvocationStats,
   IntegrationConfigProcessManagerItem,
   IntegrationConfigRepository,
 } from '../../core/integration/ports/integration-config-repository.port.js';
 import { INTEGRATION_CONFIG_REPOSITORY } from '../../core/integration/ports/integration-config-repository.port.js';
 import { IntegrationStatusEventsPublisher } from '../messaging/integration-status-events.publisher.js';
-import { PushIntegrationBackgroundProcessService } from './push-integration-background-process.service.js';
+import { PullIntegrationBackgroundProcessService } from './pull-integration-background-process.service.js';
+import type { PullIntegrationInvocationEvent } from './pull-integration-invocation.event.js';
+import { IntegrationInvocationEventBusService } from './integration-invocation-event-bus.service.js';
 
 @Injectable()
 export class IntegrationRuntimeProcessManagerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(IntegrationRuntimeProcessManagerService.name);
   private readonly syncIntervalMs = 1 * 60 * 1000;
+  private readonly systemUserId = 'integration-manager';
+  private readonly failedInvocationsStopThreshold: number;
   private intervalRef: NodeJS.Timeout | null = null;
   private syncInProgress = false;
 
@@ -18,8 +24,18 @@ export class IntegrationRuntimeProcessManagerService implements OnModuleInit, On
     @Inject(INTEGRATION_CONFIG_REPOSITORY)
     private readonly integrationConfigRepository: IntegrationConfigRepository,
     private readonly integrationStatusEventsPublisher: IntegrationStatusEventsPublisher,
-    private readonly pushIntegrationBackgroundProcessService: PushIntegrationBackgroundProcessService,
-  ) {}
+    private readonly pullIntegrationBackgroundProcessService: PullIntegrationBackgroundProcessService,
+    private readonly invocationEventBus: IntegrationInvocationEventBusService,
+    private readonly configService: ConfigService,
+  ) {
+    const thresholdRaw = this.configService.get<string>('INTEGRATION_INVOCATIONS_FAILED_STOP_THRESHOLD', '10');
+    const thresholdValue = Number.parseInt(thresholdRaw, 10);
+    this.failedInvocationsStopThreshold = Number.isInteger(thresholdValue) && thresholdValue > 0 ? thresholdValue : 10;
+  }
+
+  private readonly pullInvocationListener = (event: PullIntegrationInvocationEvent) => {
+    void this.handlePullInvocationEvent(event);
+  };
 
   onModuleInit(): void {
     this.logger.log(
@@ -28,6 +44,7 @@ export class IntegrationRuntimeProcessManagerService implements OnModuleInit, On
     this.intervalRef = setInterval(() => {
       void this.synchronizeRuntimeState();
     }, this.syncIntervalMs);
+    this.invocationEventBus.onPullInvocation(this.pullInvocationListener);
     void this.synchronizeRuntimeState();
   }
 
@@ -37,6 +54,7 @@ export class IntegrationRuntimeProcessManagerService implements OnModuleInit, On
       this.intervalRef = null;
       this.logger.log('Integration runtime process manager scheduler stopped');
     }
+    this.invocationEventBus.offPullInvocation(this.pullInvocationListener);
   }
 
   private async synchronizeRuntimeState(): Promise<void> {
@@ -88,6 +106,11 @@ export class IntegrationRuntimeProcessManagerService implements OnModuleInit, On
       if (config.status !== 'loading') {
         await this.updateRuntimeStatus(config, 'loading');
       }
+
+      await this.integrationConfigRepository.resetInvocationStatsById(config.companyId, config.id);
+      this.logger.log(
+        `Invocation stats reset before process start (companyId=${config.companyId}, id=${config.id})`,
+      );
 
       await this.startBackgroundProcess(config);
       await this.updateRuntimeStatus(config, 'work');
@@ -165,11 +188,11 @@ export class IntegrationRuntimeProcessManagerService implements OnModuleInit, On
       `Starter enqueue requested for integration (companyId=${config.companyId}, id=${config.id}, name=${config.name})`,
     );
 
-    if (config.integrationKind === 'PUSH') {
+    if (config.integrationKind === 'PULL') {
       this.logger.log(
-        `Starting PUSH_INTEGRATION_BACKGROUND_PROCESS (companyId=${config.companyId}, id=${config.id}, endpointUrl=${config.endpointUrl})`,
+        `Starting PULL_INTEGRATION_BACKGROUND_PROCESS (companyId=${config.companyId}, id=${config.id}, endpointUrl=${config.endpointUrl})`,
       );
-      await this.pushIntegrationBackgroundProcessService.run(config);
+      await this.pullIntegrationBackgroundProcessService.run(config);
       return;
     }
 
@@ -179,6 +202,20 @@ export class IntegrationRuntimeProcessManagerService implements OnModuleInit, On
   }
 
   private async stopBackgroundProcess(config: IntegrationConfigProcessManagerItem): Promise<void> {
+    if (config.integrationKind === 'PULL') {
+      const stopped = this.pullIntegrationBackgroundProcessService.stop(config.companyId, config.id);
+      if (stopped) {
+        this.logger.log(
+          `Stopped PULL_INTEGRATION_BACKGROUND_PROCESS (companyId=${config.companyId}, id=${config.id})`,
+        );
+      } else {
+        this.logger.log(
+          `PULL_INTEGRATION_BACKGROUND_PROCESS is not running (companyId=${config.companyId}, id=${config.id})`,
+        );
+      }
+      return;
+    }
+
     this.logger.log(`Stopper requested for integration (companyId=${config.companyId}, id=${config.id})`);
   }
 
@@ -187,6 +224,86 @@ export class IntegrationRuntimeProcessManagerService implements OnModuleInit, On
   }
 
   private async checkProcessHealth(config: IntegrationConfigProcessManagerItem): Promise<void> {
+    if (config.integrationKind === 'PULL') {
+      const running = this.pullIntegrationBackgroundProcessService.isRunning(config.companyId, config.id);
+      if (!running) {
+        throw new Error('PULL_INTEGRATION_BACKGROUND_PROCESS is not running');
+      }
+      this.logger.log(
+        `PULL_INTEGRATION_BACKGROUND_PROCESS heartbeat is healthy (companyId=${config.companyId}, id=${config.id})`,
+      );
+      return;
+    }
+
     this.logger.log(`Process heartbeat check (companyId=${config.companyId}, id=${config.id})`);
+  }
+
+  async handlePullInvocationEvent(event: PullIntegrationInvocationEvent): Promise<void> {
+    const stats = await this.integrationConfigRepository.registerInvocationResult(
+      event.companyId,
+      event.integrationId,
+      event.success,
+      event.errorMessage,
+    );
+    if (!stats) {
+      this.logger.warn(
+        `Received invocation event for missing integration (companyId=${event.companyId}, integrationId=${event.integrationId})`,
+      );
+      return;
+    }
+
+    this.logger.log(
+      `Invocation stats updated (companyId=${stats.companyId}, integrationId=${stats.integrationId}, success=${stats.invocationsSuccess}, failed=${stats.invocationsFailed})`,
+    );
+
+    await this.maybePublishInvocationStats(stats, event.userId);
+
+    if (stats.invocationsFailed > this.failedInvocationsStopThreshold) {
+      await this.stopIntegrationAfterTooManyFailures(stats, event.userId);
+    }
+  }
+
+  private async maybePublishInvocationStats(stats: IntegrationInvocationStats, userId?: string): Promise<void> {
+    const totalInvocations = stats.invocationsSuccess + stats.invocationsFailed;
+    if (totalInvocations % 5 !== 0) {
+      return;
+    }
+
+    await this.integrationStatusEventsPublisher.publishInvocationsChanged(
+      stats.companyId,
+      String(stats.integrationId),
+      stats.invocationsSuccess,
+      stats.invocationsFailed,
+      userId ?? this.systemUserId,
+    );
+  }
+
+  private async stopIntegrationAfterTooManyFailures(
+    stats: IntegrationInvocationStats,
+    userId?: string,
+  ): Promise<void> {
+    const stopped = this.pullIntegrationBackgroundProcessService.stop(stats.companyId, stats.integrationId);
+    if (!stopped) {
+      this.logger.warn(
+        `Failed invocations threshold reached but worker is already stopped (companyId=${stats.companyId}, integrationId=${stats.integrationId})`,
+      );
+    }
+
+    await this.integrationConfigRepository.updateActiveById(
+      stats.companyId,
+      stats.integrationId,
+      false,
+      userId ?? this.systemUserId,
+    );
+    await this.integrationConfigRepository.updateRuntimeStatusById(stats.companyId, stats.integrationId, 'stop');
+    await this.integrationStatusEventsPublisher.publishStatusChanged(
+      stats.companyId,
+      String(stats.integrationId),
+      'stop',
+      userId ?? this.systemUserId,
+    );
+    this.logger.error(
+      `Integration stopped due to failed invocations threshold (companyId=${stats.companyId}, integrationId=${stats.integrationId}, failed=${stats.invocationsFailed}, threshold=${this.failedInvocationsStopThreshold})`,
+    );
   }
 }

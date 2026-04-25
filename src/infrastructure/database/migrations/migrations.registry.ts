@@ -14,6 +14,7 @@ import { addUuidColumnToRiskObjectMigration } from './202604132200-add-uuid-colu
 import { addPullConfigToIntegrationConfigMigration } from './202604211200-add-pull-config-to-integration-config.migration.js';
 import { addRuntimeStatusToIntegrationConfigMigration } from './202604231000-add-runtime-status-to-integration-config.migration.js';
 import { addLastStatusChangedByUserToIntegrationConfigMigration } from './202604242230-add-last-status-changed-by-user-to-integration-config.migration.js';
+import { addInvocationMetricsToIntegrationConfigMigration } from './202604251510-add-invocation-metrics-to-integration-config.migration.js';
 import type { Migration } from './migration.interface.js';
 
 export const MIGRATIONS: Migration[] = [
@@ -32,5 +33,6 @@ export const MIGRATIONS: Migration[] = [
   addPullConfigToIntegrationConfigMigration,
   addRuntimeStatusToIntegrationConfigMigration,
   addLastStatusChangedByUserToIntegrationConfigMigration,
+  addInvocationMetricsToIntegrationConfigMigration,
   addUuidColumnToRiskObjectMigration,
 ];

@@ -92,6 +92,15 @@ export class GetIntegrationConfigByIdResponseDto {
   @ApiProperty({ enum: ['idle', 'loading', 'work', 'failed', 'stop'], example: 'work' })
   status!: 'idle' | 'loading' | 'work' | 'failed' | 'stop';
 
+  @ApiProperty({ example: 10 })
+  invocations_success!: number;
+
+  @ApiProperty({ example: 2 })
+  invocations_failed!: number;
+
+  @ApiProperty({ type: () => [String], example: ['timeout on partner API'] })
+  failed_comment!: string[];
+
   @ApiProperty({ example: 'Мария Петрова' })
   authorName!: string;
 

@@ -15,6 +15,7 @@ import {
   Req,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -63,6 +64,7 @@ type RequestWithAuthUser = Request & {
 @Controller()
 export class IntegrationConfigController {
   private readonly logger = new Logger(IntegrationConfigController.name);
+  private readonly failedInvocationsStopThreshold: number;
 
   constructor(
     private readonly createIntegrationConfigUseCase: CreateIntegrationConfigUseCase,
@@ -74,7 +76,12 @@ export class IntegrationConfigController {
     private readonly updateIntegrationConfigStatusUseCase: UpdateIntegrationConfigStatusUseCase,
     @Inject(USER_PERMISSION_CHECKER)
     private readonly userPermissionChecker: UserPermissionChecker,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    const thresholdRaw = this.configService.get<string>('INTEGRATION_INVOCATIONS_FAILED_STOP_THRESHOLD', '10');
+    const thresholdValue = Number.parseInt(thresholdRaw, 10);
+    this.failedInvocationsStopThreshold = Number.isInteger(thresholdValue) && thresholdValue > 0 ? thresholdValue : 10;
+  }
 
   @ApiOperation({ summary: 'Создать integration-конфиг' })
   @ApiHeader({ name: 'CompanyId', required: true, description: 'ID компании' })
@@ -157,6 +164,7 @@ export class IntegrationConfigController {
           updatedAt: item.updatedAt.toISOString(),
           active: item.active,
           status: item.status,
+          healt: this.resolveHealth(item.invocationsFailed, item.status),
           authorName: item.authorName,
         })),
         hasMore: result.hasMore,
@@ -267,6 +275,9 @@ export class IntegrationConfigController {
         pullConfig: config.pullConfig,
         active: config.active,
         status: config.status,
+        invocations_success: config.invocationsSuccess,
+        invocations_failed: config.invocationsFailed,
+        failed_comment: config.failedComment,
         authorName: config.authorName,
         updatedAt: config.updatedAt.toISOString(),
       };
@@ -486,5 +497,20 @@ export class IntegrationConfigController {
   private extractAuthorizationHeader(request?: RequestWithAuthUser): string | undefined {
     const authorizationHeader = request?.headers?.authorization;
     return typeof authorizationHeader === 'string' ? authorizationHeader : undefined;
+  }
+
+  private resolveHealth(
+    invocationsFailed: number,
+    status: 'idle' | 'loading' | 'work' | 'failed' | 'stop',
+  ): 'good' | 'warning' | 'error' {
+    if (invocationsFailed > this.failedInvocationsStopThreshold && status === 'stop') {
+      return 'error';
+    }
+
+    if (invocationsFailed > 0 && invocationsFailed <= this.failedInvocationsStopThreshold) {
+      return 'warning';
+    }
+
+    return 'good';
   }
 }

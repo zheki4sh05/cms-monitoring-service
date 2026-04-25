@@ -19,6 +19,9 @@ export class IntegrationConfigListItemDto {
   @ApiProperty({ enum: ['idle', 'loading', 'work', 'failed', 'stop'], example: 'work' })
   status!: 'idle' | 'loading' | 'work' | 'failed' | 'stop';
 
+  @ApiProperty({ enum: ['good', 'warning', 'error'], example: 'good' })
+  healt!: 'good' | 'warning' | 'error';
+
   @ApiProperty({ example: 'Мария Петрова' })
   authorName!: string;
 }

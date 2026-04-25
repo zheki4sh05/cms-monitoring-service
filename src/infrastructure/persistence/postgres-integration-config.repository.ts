@@ -8,6 +8,7 @@ import type {
 import type {
   IntegrationConfigDetails,
   IntegrationConfigHistoryPage,
+  IntegrationInvocationStats,
   IntegrationConfigListPage,
   IntegrationConfigRepository,
   IntegrationConfigProcessManagerItem,
@@ -73,6 +74,9 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
       updatedAt: Date;
       active: boolean;
       status: IntegrationRuntimeStatus;
+      invocationsSuccess: number;
+      invocationsFailed: number;
+      failedComment: unknown;
       authorName: string;
     }>(
       `
@@ -82,6 +86,9 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
           "updatedAt" AS "updatedAt",
           active,
           status,
+          "invocationsSuccess" AS "invocationsSuccess",
+          "invocationsFailed" AS "invocationsFailed",
+          "failedComment" AS "failedComment",
           "authorName" AS "authorName"
         FROM integration_config
         WHERE "companyId" = $3
@@ -102,6 +109,9 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
         updatedAt: new Date(row.updatedAt),
         active: row.active,
         status: row.status,
+        invocationsSuccess: row.invocationsSuccess,
+        invocationsFailed: row.invocationsFailed,
+        failedComment: this.parseStringArray(row.failedComment),
         authorName: row.authorName,
       })),
       hasMore,
@@ -171,6 +181,9 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
       pullConfig: PullConfig | null;
       active: boolean;
       status: IntegrationRuntimeStatus;
+      invocationsSuccess: number;
+      invocationsFailed: number;
+      failedComment: unknown;
       authorName: string;
       updatedAt: Date;
     }>(
@@ -185,6 +198,9 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
           "pullConfig" AS "pullConfig",
           active,
           status,
+          "invocationsSuccess" AS "invocationsSuccess",
+          "invocationsFailed" AS "invocationsFailed",
+          "failedComment" AS "failedComment",
           "authorName" AS "authorName",
           "updatedAt" AS "updatedAt"
         FROM integration_config
@@ -211,6 +227,9 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
       pullConfig: row.pullConfig,
       active: row.active,
       status: row.status,
+      invocationsSuccess: row.invocationsSuccess,
+      invocationsFailed: row.invocationsFailed,
+      failedComment: this.parseStringArray(row.failedComment),
       authorName: row.authorName,
       updatedAt: new Date(row.updatedAt),
     };
@@ -367,6 +386,9 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
         UPDATE integration_config
         SET
           active = $3,
+          "invocationsSuccess" = CASE WHEN $3 THEN 0 ELSE "invocationsSuccess" END,
+          "invocationsFailed" = CASE WHEN $3 THEN 0 ELSE "invocationsFailed" END,
+          "failedComment" = CASE WHEN $3 THEN '[]'::jsonb ELSE "failedComment" END,
           "lastStatusChangedByUserId" = $4,
           "updatedAt" = NOW()
         WHERE "companyId" = $1 AND id = $2
@@ -445,6 +467,74 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
     return updatedRow ? new Date(updatedRow.updatedAt) : null;
   }
 
+  async resetInvocationStatsById(companyId: string, id: number): Promise<Date | null> {
+    const result = await this.pool.query<{ updatedAt: Date }>(
+      `
+        UPDATE integration_config
+        SET
+          "invocationsSuccess" = 0,
+          "invocationsFailed" = 0,
+          "failedComment" = '[]'::jsonb,
+          "updatedAt" = NOW()
+        WHERE "companyId" = $1 AND id = $2
+        RETURNING "updatedAt" AS "updatedAt"
+      `,
+      [companyId, id],
+    );
+
+    const updatedRow = result.rows[0];
+    return updatedRow ? new Date(updatedRow.updatedAt) : null;
+  }
+
+  async registerInvocationResult(
+    companyId: string,
+    id: number,
+    success: boolean,
+    errorMessage?: string,
+  ): Promise<IntegrationInvocationStats | null> {
+    const result = await this.pool.query<{
+      companyId: string;
+      integrationId: number;
+      invocationsSuccess: number;
+      invocationsFailed: number;
+      failedComment: unknown;
+    }>(
+      `
+        UPDATE integration_config
+        SET
+          "invocationsSuccess" = CASE WHEN $3 THEN "invocationsSuccess" + 1 ELSE "invocationsSuccess" END,
+          "invocationsFailed" = CASE WHEN $3 THEN "invocationsFailed" ELSE "invocationsFailed" + 1 END,
+          "failedComment" = CASE
+            WHEN $3 THEN "failedComment"
+            WHEN $4::text IS NOT NULL THEN COALESCE("failedComment", '[]'::jsonb) || to_jsonb($4::text)
+            ELSE "failedComment"
+          END,
+          "updatedAt" = NOW()
+        WHERE "companyId" = $1 AND id = $2
+        RETURNING
+          "companyId" AS "companyId",
+          id AS "integrationId",
+          "invocationsSuccess" AS "invocationsSuccess",
+          "invocationsFailed" AS "invocationsFailed",
+          "failedComment" AS "failedComment"
+      `,
+      [companyId, id, success, errorMessage ?? null],
+    );
+
+    const row = result.rows[0];
+    if (!row) {
+      return null;
+    }
+
+    return {
+      companyId: row.companyId,
+      integrationId: row.integrationId,
+      invocationsSuccess: row.invocationsSuccess,
+      invocationsFailed: row.invocationsFailed,
+      failedComment: this.parseStringArray(row.failedComment),
+    };
+  }
+
   async deleteById(companyId: string, id: number): Promise<Date | null> {
     this.logger.log(`Deleting integration config from DB (companyId=${companyId}, id=${id})`);
     const result = await this.pool.query<{ deletedAt: Date }>(
@@ -471,5 +561,13 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
     }
 
     return JSON.stringify(value);
+  }
+
+  private parseStringArray(value: unknown): string[] {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    return value.filter((item): item is string => typeof item === 'string');
   }
 }

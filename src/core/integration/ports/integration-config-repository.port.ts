@@ -14,6 +14,9 @@ export interface IntegrationConfigListItem {
   updatedAt: Date;
   active: boolean;
   status: IntegrationRuntimeStatus;
+  invocationsSuccess: number;
+  invocationsFailed: number;
+  failedComment: string[];
   authorName: string;
 }
 
@@ -47,8 +50,19 @@ export interface IntegrationConfigDetails {
   pullConfig: PullConfig | null;
   active: boolean;
   status: IntegrationRuntimeStatus;
+  invocationsSuccess: number;
+  invocationsFailed: number;
+  failedComment: string[];
   authorName: string;
   updatedAt: Date;
+}
+
+export interface IntegrationInvocationStats {
+  companyId: string;
+  integrationId: number;
+  invocationsSuccess: number;
+  invocationsFailed: number;
+  failedComment: string[];
 }
 
 export interface UpdateIntegrationConfigInput {
@@ -99,5 +113,12 @@ export interface IntegrationConfigRepository {
     id: number,
     status: IntegrationRuntimeStatus,
   ): Promise<Date | null>;
+  resetInvocationStatsById(companyId: string, id: number): Promise<Date | null>;
+  registerInvocationResult(
+    companyId: string,
+    id: number,
+    success: boolean,
+    errorMessage?: string,
+  ): Promise<IntegrationInvocationStats | null>;
   deleteById(companyId: string, id: number): Promise<Date | null>;
 }

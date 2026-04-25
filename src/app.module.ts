@@ -28,9 +28,10 @@ import { PostgresMigratorService } from './infrastructure/database/postgres/post
 import { postgresPoolProvider } from './infrastructure/database/postgres/postgres.provider.js';
 import { PostgresPoolLifecycle } from './infrastructure/database/postgres/postgres-pool.lifecycle.js';
 import { IntegrationRuntimeProcessManagerService } from './infrastructure/background/integration-runtime-process-manager.service.js';
+import { IntegrationInvocationEventBusService } from './infrastructure/background/integration-invocation-event-bus.service.js';
 import { OutboxManagerService } from './infrastructure/background/outbox-manager.service.js';
 import { OutboxQueueService } from './infrastructure/background/outbox-queue.service.js';
-import { PushIntegrationBackgroundProcessService } from './infrastructure/background/push-integration-background-process.service.js';
+import { PullIntegrationBackgroundProcessService } from './infrastructure/background/pull-integration-background-process.service.js';
 import { CryptoUuidGenerator } from './infrastructure/identifiers/crypto-uuid.generator.js';
 import { IntegrationStatusEventsPublisher } from './infrastructure/messaging/integration-status-events.publisher.js';
 import { PostgresIntegrationConfigRepository } from './infrastructure/persistence/postgres-integration-config.repository.js';
@@ -53,7 +54,8 @@ import { RiskObjectController } from './web/risk-object/risk-object.controller.j
     postgresPoolProvider,
     PostgresPoolLifecycle,
     IntegrationRuntimeProcessManagerService,
-    PushIntegrationBackgroundProcessService,
+    IntegrationInvocationEventBusService,
+    PullIntegrationBackgroundProcessService,
     OutboxQueueService,
     OutboxManagerService,
     IntegrationStatusEventsPublisher,

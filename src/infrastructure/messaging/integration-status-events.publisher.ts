@@ -15,6 +15,19 @@ interface IntegrationStatusEventPayload {
   };
 }
 
+interface IntegrationInvocationsEventPayload {
+  userId: string;
+  companyId: string;
+  entityId: string;
+  valueType: 'text';
+  moduleType: 'integration_invocations';
+  clientType: 'admin';
+  data: {
+    invocations_success: string;
+    invocations_failed: string;
+  };
+}
+
 @Injectable()
 export class IntegrationStatusEventsPublisher implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(IntegrationStatusEventsPublisher.name);
@@ -113,6 +126,53 @@ export class IntegrationStatusEventsPublisher implements OnModuleInit, OnModuleD
     } catch (error) {
       this.logger.error(
         `Failed to publish integration status event (companyId=${companyId}, entityId=${entityId}, status=${status}): ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+    }
+  }
+
+  async publishInvocationsChanged(
+    companyId: string,
+    entityId: string,
+    invocationsSuccess: number,
+    invocationsFailed: number,
+    userId?: string,
+  ): Promise<void> {
+    if (!this.connected || !this.producer) {
+      this.logger.warn(
+        `Kafka producer is not connected, skipping integration invocations event (companyId=${companyId}, entityId=${entityId})`,
+      );
+      return;
+    }
+
+    const message: IntegrationInvocationsEventPayload = {
+      userId: userId?.trim() || this.fallbackUserId,
+      companyId,
+      entityId,
+      valueType: 'text',
+      moduleType: 'integration_invocations',
+      clientType: 'admin',
+      data: {
+        invocations_success: String(invocationsSuccess),
+        invocations_failed: String(invocationsFailed),
+      },
+    };
+
+    try {
+      await this.producer.send({
+        topic: this.topic,
+        messages: [
+          {
+            key: companyId,
+            value: JSON.stringify(message),
+          },
+        ],
+      });
+      this.logger.log(
+        `Kafka integration invocations event published (topic=${this.topic}, companyId=${companyId}, entityId=${entityId}, invocationsSuccess=${invocationsSuccess}, invocationsFailed=${invocationsFailed})`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to publish integration invocations event (companyId=${companyId}, entityId=${entityId}): ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }
   }

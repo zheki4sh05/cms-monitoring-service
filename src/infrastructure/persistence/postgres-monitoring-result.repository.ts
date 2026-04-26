@@ -70,11 +70,12 @@ export class PostgresMonitoringResultRepository {
           SELECT
             mr.id::text AS id,
             mr."integrationId" AS "integrationId",
-            mr."riskObjectId" AS "riskObjectId",
+            ro.uuid::text AS "riskObjectId",
             mr.data AS data,
             ic."mappingRules" AS "mappingRules"
           FROM monitoring_result mr
           INNER JOIN integration_config ic ON ic.id = mr."integrationId"
+          INNER JOIN risk_object ro ON ro.id = mr."riskObjectId"
           WHERE mr.id = $1
           FOR UPDATE
         `,

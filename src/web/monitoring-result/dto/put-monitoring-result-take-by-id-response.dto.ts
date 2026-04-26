@@ -4,7 +4,7 @@ export class PutMonitoringResultTakeByIdResponseDto {
   @ApiProperty({ example: 10 })
   integrationId!: number;
 
-  @ApiProperty({ example: 'ro-9f35cfa2' })
+  @ApiProperty({ example: '9d2e8ee8-f8ae-4de0-8b6b-09e9e35f3958' })
   riskobjectId!: string;
 
   @ApiProperty({

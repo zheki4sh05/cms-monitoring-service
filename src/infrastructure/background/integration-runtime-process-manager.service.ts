@@ -156,8 +156,33 @@ export class IntegrationRuntimeProcessManagerService implements OnModuleInit, On
         `Background process health check passed (companyId=${config.companyId}, id=${config.id})`,
       );
     } catch (error) {
+      if (this.isPullWorkerMissingError(error)) {
+        await this.recoverMissingWorkingProcess(config);
+        return;
+      }
       this.logger.error(
         `Background process health check failed (companyId=${config.companyId}, id=${config.id}): ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+      await this.updateRuntimeStatus(config, 'failed');
+    }
+  }
+
+  private isPullWorkerMissingError(error: unknown): boolean {
+    return error instanceof Error && error.message === 'PULL_INTEGRATION_BACKGROUND_PROCESS is not running';
+  }
+
+  private async recoverMissingWorkingProcess(config: IntegrationConfigProcessManagerItem): Promise<void> {
+    this.logger.warn(
+      `Background process is missing for work status, attempting recovery (companyId=${config.companyId}, id=${config.id}, kind=${config.integrationKind})`,
+    );
+    try {
+      await this.startBackgroundProcess(config);
+      this.logger.log(
+        `Background process recovered for work status (companyId=${config.companyId}, id=${config.id})`,
+      );
+    } catch (startError) {
+      this.logger.error(
+        `Background process recovery failed (companyId=${config.companyId}, id=${config.id}): ${startError instanceof Error ? startError.message : 'Unknown error'}`,
       );
       await this.updateRuntimeStatus(config, 'failed');
     }

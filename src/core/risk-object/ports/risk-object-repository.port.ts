@@ -81,6 +81,7 @@ export interface RiskObjectRepository {
     historyId: number,
   ): Promise<RiskObjectChangeHistoryDetails | null>;
   getById(companyId: string, id: string): Promise<RiskObjectDetails | null>;
+  getByUuid(companyId: string, uuid: string): Promise<RiskObjectDetails | null>;
   updateById(input: UpdateRiskObjectInput): Promise<Date | null>;
   updateStatusById(companyId: string, id: string, status: RiskObjectStatus): Promise<Date | null>;
 }

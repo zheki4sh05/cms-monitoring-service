@@ -17,6 +17,7 @@ import { CreateRiskObjectUseCase } from './core/risk-object/use-cases/create-ris
 import { GetRiskObjectChangeHistoryByIdUseCase } from './core/risk-object/use-cases/get-risk-object-change-history-by-id.use-case.js';
 import { GetRiskObjectChangeHistoryUseCase } from './core/risk-object/use-cases/get-risk-object-change-history.use-case.js';
 import { GetRiskObjectByIdUseCase } from './core/risk-object/use-cases/get-risk-object-by-id.use-case.js';
+import { GetRiskObjectByUuidUseCase } from './core/risk-object/use-cases/get-risk-object-by-uuid.use-case.js';
 import { GetRiskObjectModelsUseCase } from './core/risk-object/use-cases/get-risk-object-models.use-case.js';
 import { GetRiskObjectsUseCase } from './core/risk-object/use-cases/get-risk-objects.use-case.js';
 import { UpdateRiskObjectByIdUseCase } from './core/risk-object/use-cases/update-risk-object-by-id.use-case.js';
@@ -176,6 +177,12 @@ import { RiskObjectController } from './web/risk-object/risk-object.controller.j
       inject: [RISK_OBJECT_REPOSITORY],
       useFactory: (riskObjectRepository: RiskObjectRepository) =>
         new GetRiskObjectByIdUseCase(riskObjectRepository),
+    },
+    {
+      provide: GetRiskObjectByUuidUseCase,
+      inject: [RISK_OBJECT_REPOSITORY],
+      useFactory: (riskObjectRepository: RiskObjectRepository) =>
+        new GetRiskObjectByUuidUseCase(riskObjectRepository),
     },
     {
       provide: UpdateRiskObjectByIdUseCase,

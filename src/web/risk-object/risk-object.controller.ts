@@ -28,6 +28,7 @@ import { CreateRiskObjectUseCase } from '../../core/risk-object/use-cases/create
 import { GetRiskObjectChangeHistoryByIdUseCase } from '../../core/risk-object/use-cases/get-risk-object-change-history-by-id.use-case.js';
 import { GetRiskObjectChangeHistoryUseCase } from '../../core/risk-object/use-cases/get-risk-object-change-history.use-case.js';
 import { GetRiskObjectByIdUseCase } from '../../core/risk-object/use-cases/get-risk-object-by-id.use-case.js';
+import { GetRiskObjectByUuidUseCase } from '../../core/risk-object/use-cases/get-risk-object-by-uuid.use-case.js';
 import { GetRiskObjectModelsUseCase } from '../../core/risk-object/use-cases/get-risk-object-models.use-case.js';
 import { GetRiskObjectsUseCase } from '../../core/risk-object/use-cases/get-risk-objects.use-case.js';
 import { UpdateRiskObjectByIdUseCase } from '../../core/risk-object/use-cases/update-risk-object-by-id.use-case.js';
@@ -45,6 +46,7 @@ import { PutRiskObjectByIdRequestDto } from './dto/put-risk-object-by-id-request
 import { PutRiskObjectByIdResponseDto } from './dto/put-risk-object-by-id-response.dto.js';
 import { PutRiskObjectStatusRequestDto } from './dto/put-risk-object-status-request.dto.js';
 import type { Request } from 'express';
+import { Public } from '../auth/public.decorator.js';
 
 type RequestWithAuthUser = Request & {
   authenticatedUser?: AuthenticatedUser;
@@ -61,6 +63,7 @@ export class RiskObjectController {
     private readonly getRiskObjectModelsUseCase: GetRiskObjectModelsUseCase,
     private readonly getRiskObjectsUseCase: GetRiskObjectsUseCase,
     private readonly getRiskObjectByIdUseCase: GetRiskObjectByIdUseCase,
+    private readonly getRiskObjectByUuidUseCase: GetRiskObjectByUuidUseCase,
     private readonly updateRiskObjectByIdUseCase: UpdateRiskObjectByIdUseCase,
     private readonly updateRiskObjectStatusUseCase: UpdateRiskObjectStatusUseCase,
   ) {}
@@ -254,6 +257,52 @@ export class RiskObjectController {
     }
   }
 
+  @Public()
+  @ApiOperation({ summary: 'Внутренний API: получить рисковый объект по uuid (только локальный вызов)' })
+  @ApiHeader({ name: 'CompanyId', required: true, description: 'ID компании' })
+  @ApiParam({ name: 'id', required: true, example: '123e4567-e89b-12d3-a456-426614174000' })
+  @ApiOkResponse({ type: GetRiskObjectByIdResponseDto })
+  @ApiNotFoundResponse({ description: 'Рисковый объект не найден' })
+  @ApiBadRequestResponse({
+    description: 'Некорректный uuid/CompanyId или запрос не является локальным межсервисным вызовом',
+  })
+  @Get('internal/risk-objects/:id')
+  async getRiskObjectByIdForInterservice(
+    @Headers('companyid') companyIdHeader: string | undefined,
+    @Param('id') uuidParam: string | undefined,
+    @Req() request: Request,
+  ): Promise<GetRiskObjectByIdResponseDto> {
+    this.assertLocalRequestOnly(request);
+    const companyId = this.parseRequiredHeader(companyIdHeader, 'CompanyId');
+
+    try {
+      const riskObject = await this.getRiskObjectByUuidUseCase.execute({
+        companyId,
+        uuid: uuidParam ?? '',
+      });
+
+      if (!riskObject) {
+        throw new NotFoundException('Risk object not found.');
+      }
+
+      return {
+        id: riskObject.id,
+        uuid: riskObject.uuid,
+        code: riskObject.code,
+        name: riskObject.name,
+        status: riskObject.status,
+        updatedAt: riskObject.updatedAt.toISOString(),
+        definition: JSON.stringify(riskObject.definition),
+      };
+    } catch (error) {
+      if (error instanceof DomainValidationError) {
+        throw new BadRequestException(error.message);
+      }
+
+      throw error;
+    }
+  }
+
   @ApiOperation({ summary: 'Обновление рискового объекта' })
   @ApiHeader({ name: 'CompanyId', required: true, description: 'ID компании' })
   @ApiParam({ name: 'id', required: true, example: 'ro-1' })
@@ -411,6 +460,18 @@ export class RiskObjectController {
     }
 
     return rawValue.trim();
+  }
+
+  private assertLocalRequestOnly(request: Request): void {
+    const remoteAddress = request.socket?.remoteAddress?.trim();
+    const isLocalRequest =
+      remoteAddress === '127.0.0.1' ||
+      remoteAddress === '::1' ||
+      remoteAddress === '::ffff:127.0.0.1';
+
+    if (!isLocalRequest) {
+      throw new BadRequestException('Only local interservice requests are allowed.');
+    }
   }
 
 }

@@ -248,6 +248,41 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
     };
   }
 
+  async getByUuid(companyId: string, uuid: string): Promise<RiskObjectDetails | null> {
+    const result = await this.pool.query<{
+      id: string;
+      uuid: string;
+      code: string;
+      name: string;
+      active: boolean;
+      updatedAt: Date;
+      definition: Record<string, unknown>;
+    }>(
+      `
+        SELECT id, uuid::text AS uuid, code, name, active, "updatedAt", definition
+        FROM risk_object
+        WHERE "companyId" = $1 AND uuid = $2::uuid
+        LIMIT 1
+      `,
+      [companyId, uuid],
+    );
+
+    const row = result.rows[0];
+    if (!row) {
+      return null;
+    }
+
+    return {
+      id: row.id,
+      uuid: row.uuid,
+      code: row.code,
+      name: row.name,
+      status: row.active ? 'active' : 'archived',
+      updatedAt: new Date(row.updatedAt),
+      definition: row.definition ?? {},
+    };
+  }
+
   async updateById(input: UpdateRiskObjectInput): Promise<Date | null> {
     const client = await this.pool.connect();
 

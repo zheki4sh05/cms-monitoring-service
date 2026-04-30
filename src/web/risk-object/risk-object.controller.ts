@@ -4,6 +4,7 @@ import {
   Controller,
   Get,
   Headers,
+  Logger,
   NotFoundException,
   Param,
   Post,
@@ -56,6 +57,8 @@ type RequestWithAuthUser = Request & {
 @ApiBearerAuth('bearer')
 @Controller()
 export class RiskObjectController {
+  private readonly logger = new Logger(RiskObjectController.name);
+
   constructor(
     private readonly createRiskObjectUseCase: CreateRiskObjectUseCase,
     private readonly getRiskObjectChangeHistoryUseCase: GetRiskObjectChangeHistoryUseCase,
@@ -268,11 +271,18 @@ export class RiskObjectController {
   })
   @Get('internal/risk-objects/:id')
   async getRiskObjectByIdForInterservice(
-    @Headers('companyid') companyIdHeader: string | undefined,
+    @Headers('CompanyId') companyIdHeader: string | undefined,
     @Param('id') uuidParam: string | undefined,
     @Req() request: Request,
   ): Promise<GetRiskObjectByIdResponseDto> {
-    this.assertLocalRequestOnly(request);
+    const startedAt = Date.now();
+    const remoteAddress = request.socket?.remoteAddress?.trim() ?? 'unknown';
+    const userAgent = request.headers['user-agent'] ?? 'unknown';
+    this.logger.log(
+      `GET /internal/risk-objects/:id started (uuid=${uuidParam ?? 'undefined'}, companyId=${companyIdHeader ?? 'undefined'}, remoteAddress=${remoteAddress}, userAgent=${userAgent})`,
+    );
+
+    this.assertLocalRequestOnly(request, remoteAddress);
     const companyId = this.parseRequiredHeader(companyIdHeader, 'CompanyId');
 
     try {
@@ -282,9 +292,15 @@ export class RiskObjectController {
       });
 
       if (!riskObject) {
+        this.logger.warn(
+          `GET /internal/risk-objects/:id not found (uuid=${uuidParam ?? 'undefined'}, companyId=${companyId})`,
+        );
         throw new NotFoundException('Risk object not found.');
       }
 
+      this.logger.log(
+        `GET /internal/risk-objects/:id success (id=${riskObject.id}, uuid=${riskObject.uuid}, companyId=${companyId}, elapsedMs=${Date.now() - startedAt})`,
+      );
       return {
         id: riskObject.id,
         uuid: riskObject.uuid,
@@ -296,9 +312,15 @@ export class RiskObjectController {
       };
     } catch (error) {
       if (error instanceof DomainValidationError) {
+        this.logger.warn(
+          `GET /internal/risk-objects/:id validation failed (uuid=${uuidParam ?? 'undefined'}, companyId=${companyId}, reason=${error.message}, elapsedMs=${Date.now() - startedAt})`,
+        );
         throw new BadRequestException(error.message);
       }
 
+      this.logger.error(
+        `GET /internal/risk-objects/:id failed (uuid=${uuidParam ?? 'undefined'}, companyId=${companyId}, elapsedMs=${Date.now() - startedAt}): ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
       throw error;
     }
   }
@@ -462,14 +484,17 @@ export class RiskObjectController {
     return rawValue.trim();
   }
 
-  private assertLocalRequestOnly(request: Request): void {
-    const remoteAddress = request.socket?.remoteAddress?.trim();
+  private assertLocalRequestOnly(request: Request, remoteAddress?: string): void {
+    const detectedRemoteAddress = remoteAddress ?? request.socket?.remoteAddress?.trim();
     const isLocalRequest =
-      remoteAddress === '127.0.0.1' ||
-      remoteAddress === '::1' ||
-      remoteAddress === '::ffff:127.0.0.1';
+      detectedRemoteAddress === '127.0.0.1' ||
+      detectedRemoteAddress === '::1' ||
+      detectedRemoteAddress === '::ffff:127.0.0.1';
 
     if (!isLocalRequest) {
+      this.logger.warn(
+        `GET /internal/risk-objects/:id rejected: non-local request (remoteAddress=${detectedRemoteAddress ?? 'unknown'})`,
+      );
       throw new BadRequestException('Only local interservice requests are allowed.');
     }
   }

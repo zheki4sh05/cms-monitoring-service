@@ -54,6 +54,7 @@ import { PutIntegrationConfigByIdResponseDto } from './dto/put-integration-confi
 import { PutIntegrationConfigStatusRequestDto } from './dto/put-integration-config-status-request.dto.js';
 import { PutIntegrationConfigStatusResponseDto } from './dto/put-integration-config-status-response.dto.js';
 import type { Request } from 'express';
+import { Public } from '../auth/public.decorator.js';
 
 type RequestWithAuthUser = Request & {
   authenticatedUser?: AuthenticatedUser;
@@ -229,6 +230,86 @@ export class IntegrationConfigController {
         throw new BadRequestException(error.message);
       }
 
+      throw error;
+    }
+  }
+
+  @ApiOperation({ summary: 'Просмотр интеграции по id' })
+  @ApiHeader({ name: 'CompanyId', required: true, description: 'ID компании' })
+  @ApiParam({ name: 'id', required: true, example: 'ic-1' })
+  @ApiOkResponse({ type: GetIntegrationConfigByIdResponseDto })
+  @ApiNotFoundResponse({ description: 'Интеграция не найдена' })
+  @ApiBadRequestResponse({ description: 'Некорректный id или CompanyId' })
+  @Public()
+  @ApiOperation({ summary: 'Внутренний API: получить integration-конфиг по id (только локальный вызов)' })
+  @ApiHeader({ name: 'CompanyId', required: true, description: 'ID компании' })
+  @ApiParam({ name: 'id', required: true, example: 'ic-1' })
+  @ApiOkResponse({ type: GetIntegrationConfigByIdResponseDto })
+  @ApiNotFoundResponse({ description: 'Интеграция не найдена' })
+  @ApiBadRequestResponse({
+    description: 'Некорректный id/CompanyId или запрос не является локальным межсервисным вызовом',
+  })
+  @Get('internal/integration-configs/:id')
+  async getIntegrationConfigByIdForInterservice(
+    @Headers('companyid') companyIdHeader: string | undefined,
+    @Param('id') idParam: string | undefined,
+    @Req() request: Request,
+  ): Promise<GetIntegrationConfigByIdResponseDto> {
+    const startedAt = Date.now();
+    const remoteAddress = request.socket?.remoteAddress?.trim() ?? 'unknown';
+    this.logger.log(
+      `GET /internal/integration-configs/:id started (id=${idParam ?? 'undefined'}, companyId=${companyIdHeader ?? 'undefined'}, remoteAddress=${remoteAddress})`,
+    );
+
+    this.assertLocalRequestOnly(request, remoteAddress);
+    const companyId = this.parseRequiredHeader(companyIdHeader, 'CompanyId');
+    const integrationConfigId = this.parseRequiredHeader(idParam, 'id');
+
+    try {
+      const config = await this.getIntegrationConfigByIdUseCase.execute({
+        companyId,
+        integrationConfigId,
+      });
+
+      if (!config) {
+        this.logger.warn(
+          `GET /internal/integration-configs/:id not found (id=${integrationConfigId}, companyId=${companyId})`,
+        );
+        throw new NotFoundException('Integration config not found.');
+      }
+
+      const mappingRules = Array.isArray(config.mappingRules) ? config.mappingRules : [];
+      this.logger.log(
+        `GET /internal/integration-configs/:id success (id=${integrationConfigId}, companyId=${companyId}, elapsedMs=${Date.now() - startedAt})`,
+      );
+      return {
+        id: `ic-${config.id}`,
+        number: config.number,
+        name: config.name,
+        integrationKind: config.integrationKind.toLowerCase() as 'push' | 'pull' | 'broker',
+        endpointUrl: config.endpointUrl,
+        riskObjectModelId: config.riskObjectModelId,
+        mapping_rules: mappingRules as { from: string; to: string; transform?: string }[],
+        pullConfig: config.pullConfig,
+        active: config.active,
+        status: config.status,
+        invocations_success: config.invocationsSuccess,
+        invocations_failed: config.invocationsFailed,
+        failed_comment: config.failedComment,
+        authorName: config.authorName,
+        updatedAt: config.updatedAt.toISOString(),
+      };
+    } catch (error) {
+      if (error instanceof DomainValidationError) {
+        this.logger.warn(
+          `GET /internal/integration-configs/:id validation failed (id=${integrationConfigId}, companyId=${companyId}, reason=${error.message}, elapsedMs=${Date.now() - startedAt})`,
+        );
+        throw new BadRequestException(error.message);
+      }
+
+      this.logger.error(
+        `GET /internal/integration-configs/:id failed (id=${integrationConfigId}, companyId=${companyId}, elapsedMs=${Date.now() - startedAt}): ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
       throw error;
     }
   }
@@ -497,6 +578,21 @@ export class IntegrationConfigController {
   private extractAuthorizationHeader(request?: RequestWithAuthUser): string | undefined {
     const authorizationHeader = request?.headers?.authorization;
     return typeof authorizationHeader === 'string' ? authorizationHeader : undefined;
+  }
+
+  private assertLocalRequestOnly(request: Request, remoteAddress?: string): void {
+    const detectedRemoteAddress = remoteAddress ?? request.socket?.remoteAddress?.trim();
+    const isLocalRequest =
+      detectedRemoteAddress === '127.0.0.1' ||
+      detectedRemoteAddress === '::1' ||
+      detectedRemoteAddress === '::ffff:127.0.0.1';
+
+    if (!isLocalRequest) {
+      this.logger.warn(
+        `GET /internal/integration-configs/:id rejected: non-local request (remoteAddress=${detectedRemoteAddress ?? 'unknown'})`,
+      );
+      throw new BadRequestException('Only local interservice requests are allowed.');
+    }
   }
 
   private resolveHealth(

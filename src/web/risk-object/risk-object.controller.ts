@@ -278,14 +278,30 @@ export class RiskObjectController {
     const startedAt = Date.now();
     const remoteAddress = request.socket?.remoteAddress?.trim() ?? 'unknown';
     const userAgent = request.headers['user-agent'] ?? 'unknown';
+    const xForwardedFor = request.headers['x-forwarded-for'] ?? 'unknown';
+    const xRealIp = request.headers['x-real-ip'] ?? 'unknown';
+    const xRequestId = request.headers['x-request-id'] ?? 'unknown';
+    const xCorrelationId = request.headers['x-correlation-id'] ?? 'unknown';
+    const host = request.headers.host ?? 'unknown';
+    const normalizedUuid = uuidParam?.trim() ?? '';
+    const normalizedCompanyId = companyIdHeader?.trim() ?? '';
+    this.logger.log(
+      `GET /internal/risk-objects/:id request details (method=${request.method}, originalUrl=${request.originalUrl}, path=${request.path}, host=${host}, ip=${request.ip ?? 'unknown'}, remoteAddress=${remoteAddress}, xForwardedFor=${Array.isArray(xForwardedFor) ? xForwardedFor.join(',') : xForwardedFor}, xRealIp=${Array.isArray(xRealIp) ? xRealIp.join(',') : xRealIp}, xRequestId=${Array.isArray(xRequestId) ? xRequestId.join(',') : xRequestId}, xCorrelationId=${Array.isArray(xCorrelationId) ? xCorrelationId.join(',') : xCorrelationId}, userAgent=${Array.isArray(userAgent) ? userAgent.join(',') : userAgent})`,
+    );
     this.logger.log(
       `GET /internal/risk-objects/:id started (uuid=${uuidParam ?? 'undefined'}, companyId=${companyIdHeader ?? 'undefined'}, remoteAddress=${remoteAddress}, userAgent=${userAgent})`,
     );
 
     this.assertLocalRequestOnly(request, remoteAddress);
     const companyId = this.parseRequiredHeader(companyIdHeader, 'CompanyId');
+    this.logger.log(
+      `GET /internal/risk-objects/:id input normalized (uuidRaw=${uuidParam ?? 'undefined'}, uuidNormalized=${normalizedUuid || 'empty'}, companyIdRaw=${companyIdHeader ?? 'undefined'}, companyIdNormalized=${normalizedCompanyId || 'empty'})`,
+    );
 
     try {
+      this.logger.log(
+        `GET /internal/risk-objects/:id querying repository by uuid (uuid=${normalizedUuid || 'empty'}, companyId=${companyId})`,
+      );
       const riskObject = await this.getRiskObjectByUuidUseCase.execute({
         companyId,
         uuid: uuidParam ?? '',
@@ -293,7 +309,7 @@ export class RiskObjectController {
 
       if (!riskObject) {
         this.logger.warn(
-          `GET /internal/risk-objects/:id not found (uuid=${uuidParam ?? 'undefined'}, companyId=${companyId})`,
+          `GET /internal/risk-objects/:id not found (uuid=${uuidParam ?? 'undefined'}, uuidNormalized=${normalizedUuid || 'empty'}, companyId=${companyId}, elapsedMs=${Date.now() - startedAt})`,
         );
         throw new NotFoundException('Risk object not found.');
       }
@@ -319,7 +335,7 @@ export class RiskObjectController {
       }
 
       this.logger.error(
-        `GET /internal/risk-objects/:id failed (uuid=${uuidParam ?? 'undefined'}, companyId=${companyId}, elapsedMs=${Date.now() - startedAt}): ${error instanceof Error ? error.message : 'Unknown error'}`,
+        `GET /internal/risk-objects/:id failed (uuid=${uuidParam ?? 'undefined'}, uuidNormalized=${normalizedUuid || 'empty'}, companyId=${companyId}, elapsedMs=${Date.now() - startedAt}, errorName=${error instanceof Error ? error.name : 'UnknownError'}): ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
       throw error;
     }

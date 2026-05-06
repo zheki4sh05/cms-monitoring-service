@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Pool } from 'pg';
 import type { PoolClient } from 'pg';
 import type { RiskObject } from '../../core/risk-object/domain/risk-object.js';
@@ -16,6 +16,8 @@ import { PG_POOL } from '../database/postgres/postgres.tokens.js';
 
 @Injectable()
 export class PostgresRiskObjectRepository implements RiskObjectRepository {
+  private readonly logger = new Logger(PostgresRiskObjectRepository.name);
+
   constructor(@Inject(PG_POOL) private readonly pool: Pool) {}
 
   async save(riskObject: RiskObject): Promise<void> {
@@ -249,6 +251,9 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
   }
 
   async getByUuid(companyId: string, uuid: string): Promise<RiskObjectDetails | null> {
+    this.logger.log(
+      `getByUuid started (companyId=${companyId || 'empty'}, uuid=${uuid || 'empty'})`,
+    );
     const result = await this.pool.query<{
       id: string;
       uuid: string;
@@ -266,11 +271,21 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
       `,
       [companyId, uuid],
     );
+    this.logger.log(
+      `getByUuid query finished (companyId=${companyId || 'empty'}, uuid=${uuid || 'empty'}, rowsCount=${result.rowCount ?? result.rows.length})`,
+    );
 
     const row = result.rows[0];
     if (!row) {
+      this.logger.warn(
+        `getByUuid not found (companyId=${companyId || 'empty'}, uuid=${uuid || 'empty'})`,
+      );
       return null;
     }
+
+    this.logger.log(
+      `getByUuid found risk object (companyId=${companyId || 'empty'}, uuid=${uuid || 'empty'}, id=${row.id}, code=${row.code})`,
+    );
 
     return {
       id: row.id,

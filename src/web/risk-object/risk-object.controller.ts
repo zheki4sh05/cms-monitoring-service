@@ -88,6 +88,7 @@ export class RiskObjectController {
       const riskObject = await this.createRiskObjectUseCase.execute({
         companyId,
         authorId,
+        departmentId: body.departmentId,
         name: body.name,
         definition: body.definition,
       });
@@ -146,6 +147,7 @@ export class RiskObjectController {
           id: item.id,
           riskObjectId: item.riskObjectId,
           name: item.name,
+          departmentId: item.departmentId,
           changeComment: item.changeComment,
           status: item.status,
           changedAt: item.changedAt.toISOString(),
@@ -205,6 +207,7 @@ export class RiskObjectController {
           id: item.id,
           code: item.code,
           name: item.name,
+          departmentId: item.departmentId,
           status: item.status,
           updatedAt: item.updatedAt.toISOString(),
         })),
@@ -247,6 +250,7 @@ export class RiskObjectController {
         uuid: riskObject.uuid,
         code: riskObject.code,
         name: riskObject.name,
+        departmentId: riskObject.departmentId,
         status: riskObject.status,
         updatedAt: riskObject.updatedAt.toISOString(),
         definition: JSON.stringify(riskObject.definition),
@@ -322,6 +326,7 @@ export class RiskObjectController {
         uuid: riskObject.uuid,
         code: riskObject.code,
         name: riskObject.name,
+        departmentId: riskObject.departmentId,
         status: riskObject.status,
         updatedAt: riskObject.updatedAt.toISOString(),
         definition: JSON.stringify(riskObject.definition),
@@ -365,6 +370,7 @@ export class RiskObjectController {
         companyId: string;
         id: string;
         lastModifiedBy: string;
+        departmentId: string;
         name: string;
         definition: Record<string, unknown>;
         changeComment: string;
@@ -373,6 +379,7 @@ export class RiskObjectController {
         companyId,
         id: riskObjectId,
         lastModifiedBy,
+        departmentId: body.departmentId,
         name: body.name,
         definition: body.definition,
         changeComment: body.changeComment,
@@ -467,6 +474,7 @@ export class RiskObjectController {
         riskObjectId: historyRecord.riskObjectId,
         changedAt: historyRecord.changedAt.toISOString(),
         riskObjectName: historyRecord.riskObjectName,
+        departmentId: historyRecord.departmentId,
         description: historyRecord.description,
         authorName: historyRecord.authorName,
       };

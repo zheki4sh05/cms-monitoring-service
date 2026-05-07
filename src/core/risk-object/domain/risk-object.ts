@@ -2,6 +2,7 @@ export interface RiskObject {
   id: string;
   code?: string;
   companyId: string;
+  departmentId: string;
   authorId: string;
   lastModifiedBy: string;
   name: string;

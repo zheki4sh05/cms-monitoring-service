@@ -8,6 +8,7 @@ export interface RiskObjectListItem {
   id: string;
   code: string;
   name: string;
+  departmentId: string;
   status: RiskObjectStatus;
   updatedAt: Date;
 }
@@ -21,12 +22,14 @@ export interface RiskObjectModelBrief {
   id: string;
   uuid: string;
   name: string;
+  departmentId: string;
 }
 
 export interface RiskObjectChangeHistoryItem {
   id: number;
   riskObjectId: string;
   name: string;
+  departmentId: string;
   changeComment: string;
   status: RiskObjectStatus;
   changedAt: Date;
@@ -42,6 +45,7 @@ export interface RiskObjectChangeHistoryDetails {
   riskObjectId: string;
   changedAt: Date;
   riskObjectName: string;
+  departmentId: string;
   description: string;
   authorName: string;
 }
@@ -51,6 +55,7 @@ export interface RiskObjectDetails {
   uuid: string;
   code: string;
   name: string;
+  departmentId: string;
   status: RiskObjectStatus;
   updatedAt: Date;
   definition: Record<string, unknown>;
@@ -60,6 +65,7 @@ export interface UpdateRiskObjectInput {
   companyId: string;
   id: string;
   lastModifiedBy: string;
+  departmentId: string;
   name: string;
   definition: Record<string, unknown>;
   changeComment: string;

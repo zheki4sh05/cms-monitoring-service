@@ -9,6 +9,9 @@ export class RiskObjectModelBriefDto {
 
   @ApiProperty({ example: 'ООО «Вектор»' })
   name!: string;
+
+  @ApiProperty({ example: 'dep-1' })
+  departmentId!: string;
 }
 
 export class GetRiskObjectModelsResponseDto {

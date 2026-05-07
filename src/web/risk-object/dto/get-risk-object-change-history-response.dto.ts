@@ -10,6 +10,9 @@ export class RiskObjectChangeHistoryItemDto {
   @ApiProperty({ example: 'ООО «Вектор»' })
   name!: string;
 
+  @ApiProperty({ example: 'dep-1' })
+  departmentId!: string;
+
   @ApiProperty({ example: 'Обновил ключи и статус' })
   changeComment!: string;
 

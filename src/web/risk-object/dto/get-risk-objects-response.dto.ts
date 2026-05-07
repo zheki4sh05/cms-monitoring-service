@@ -10,6 +10,9 @@ export class RiskObjectListItemDto {
   @ApiProperty({ example: 'ООО «Вектор»' })
   name!: string;
 
+  @ApiProperty({ example: 'dep-1' })
+  departmentId!: string;
+
   @ApiProperty({ enum: ['active', 'archived'], example: 'active' })
   status!: 'active' | 'archived';
 

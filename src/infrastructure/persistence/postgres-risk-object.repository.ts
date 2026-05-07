@@ -32,6 +32,7 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
           INSERT INTO risk_object (
             id,
             "companyId",
+            "departmentId",
             code,
             "authorId",
             "lastModifiedBy",
@@ -42,11 +43,12 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
             active,
             uuid
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11::uuid)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $12::uuid)
         `,
         [
           riskObject.id,
           riskObject.companyId,
+          riskObject.departmentId,
           code,
           riskObject.authorId,
           riskObject.lastModifiedBy,
@@ -69,9 +71,9 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
   }
 
   async listModelsBrief(companyId: string): Promise<RiskObjectModelBrief[]> {
-    const result = await this.pool.query<{ id: string; name: string; uuid: string }>(
+    const result = await this.pool.query<{ id: string; name: string; uuid: string; departmentId: string }>(
       `
-        SELECT id, name, uuid::text AS uuid
+        SELECT id, name, uuid::text AS uuid, "departmentId" AS "departmentId"
         FROM risk_object
         WHERE "companyId" = $1
         ORDER BY name ASC, id ASC
@@ -83,6 +85,7 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
       id: row.id,
       uuid: row.uuid,
       name: row.name,
+      departmentId: row.departmentId,
     }));
   }
 
@@ -94,11 +97,12 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
       id: string;
       code: string;
       name: string;
+      departmentId: string;
       active: boolean;
       updatedAt: Date;
     }>(
       `
-        SELECT id, code, name, active, "updatedAt"
+        SELECT id, code, name, "departmentId" AS "departmentId", active, "updatedAt"
         FROM risk_object
         WHERE "companyId" = $3
         ORDER BY "updatedAt" DESC, id DESC
@@ -115,6 +119,7 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
         id: row.id,
         code: row.code,
         name: row.name,
+        departmentId: row.departmentId,
         status: row.active ? 'active' : 'archived',
         updatedAt: new Date(row.updatedAt),
       })),
@@ -131,6 +136,7 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
       riskObjectId: string;
       changedAt: Date;
       riskObjectName: string;
+      departmentId: string;
       description: string;
       authorName: string;
     }>(
@@ -140,6 +146,7 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
           "riskObjectId" AS "riskObjectId",
           "changedAt" AS "changedAt",
           name AS "riskObjectName",
+          "departmentId" AS "departmentId",
           "changeComment" AS description,
           "authorName" AS "authorName"
         FROM risk_object_history
@@ -159,6 +166,7 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
       riskObjectId: row.riskObjectId,
       changedAt: new Date(row.changedAt),
       riskObjectName: row.riskObjectName,
+      departmentId: row.departmentId,
       description: row.description,
       authorName: row.authorName,
     };
@@ -178,6 +186,7 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
       id: number;
       riskObjectId: string;
       name: string;
+      departmentId: string;
       changeComment: string;
       active: boolean;
       changedAt: Date;
@@ -187,6 +196,7 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
           id,
           "riskObjectId" AS "riskObjectId",
           name,
+          "departmentId" AS "departmentId",
           "changeComment" AS "changeComment",
           active,
           "changedAt" AS "changedAt"
@@ -207,6 +217,7 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
         id: row.id,
         riskObjectId: row.riskObjectId,
         name: row.name,
+        departmentId: row.departmentId,
         changeComment: row.changeComment,
         status: row.active ? 'active' : 'archived',
         changedAt: new Date(row.changedAt),
@@ -221,12 +232,21 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
       uuid: string;
       code: string;
       name: string;
+      departmentId: string;
       active: boolean;
       updatedAt: Date;
       definition: Record<string, unknown>;
     }>(
       `
-        SELECT id, uuid::text AS uuid, code, name, active, "updatedAt", definition
+        SELECT
+          id,
+          uuid::text AS uuid,
+          code,
+          name,
+          "departmentId" AS "departmentId",
+          active,
+          "updatedAt",
+          definition
         FROM risk_object
         WHERE "companyId" = $1 AND id = $2
         LIMIT 1
@@ -244,6 +264,7 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
       uuid: row.uuid,
       code: row.code,
       name: row.name,
+      departmentId: row.departmentId,
       status: row.active ? 'active' : 'archived',
       updatedAt: new Date(row.updatedAt),
       definition: row.definition ?? {},
@@ -259,12 +280,21 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
       uuid: string;
       code: string;
       name: string;
+      departmentId: string;
       active: boolean;
       updatedAt: Date;
       definition: Record<string, unknown>;
     }>(
       `
-        SELECT id, uuid::text AS uuid, code, name, active, "updatedAt", definition
+        SELECT
+          id,
+          uuid::text AS uuid,
+          code,
+          name,
+          "departmentId" AS "departmentId",
+          active,
+          "updatedAt",
+          definition
         FROM risk_object
         WHERE "companyId" = $1 AND uuid = $2::uuid
         LIMIT 1
@@ -292,6 +322,7 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
       uuid: row.uuid,
       code: row.code,
       name: row.name,
+      departmentId: row.departmentId,
       status: row.active ? 'active' : 'archived',
       updatedAt: new Date(row.updatedAt),
       definition: row.definition ?? {},
@@ -307,6 +338,7 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
       const currentResult = await client.query<{
         id: string;
         companyId: string;
+        departmentId: string;
         code: string;
         name: string;
         definition: Record<string, unknown>;
@@ -318,6 +350,7 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
           SELECT
             id,
             "companyId" AS "companyId",
+            "departmentId" AS "departmentId",
             code,
             name,
             definition,
@@ -342,6 +375,7 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
           INSERT INTO risk_object_history (
             "riskObjectId",
             "companyId",
+            "departmentId",
             code,
             name,
             definition,
@@ -352,11 +386,12 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
             "authorName",
             "changedAt"
           )
-          VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, NOW())
+          VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10, $11, NOW())
         `,
         [
           currentRow.id,
           currentRow.companyId,
+          currentRow.departmentId,
           currentRow.code,
           currentRow.name,
           JSON.stringify(currentRow.definition),
@@ -373,13 +408,21 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
           UPDATE risk_object
           SET
             name = $3,
-            definition = $4::jsonb,
-            "lastModifiedBy" = $5,
+            "departmentId" = $4,
+            definition = $5::jsonb,
+            "lastModifiedBy" = $6,
             "updatedAt" = NOW()
           WHERE "companyId" = $1 AND id = $2
           RETURNING "updatedAt" AS "updatedAt"
         `,
-        [input.companyId, input.id, input.name, JSON.stringify(input.definition), input.lastModifiedBy],
+        [
+          input.companyId,
+          input.id,
+          input.name,
+          input.departmentId,
+          JSON.stringify(input.definition),
+          input.lastModifiedBy,
+        ],
       );
 
       await client.query('COMMIT');

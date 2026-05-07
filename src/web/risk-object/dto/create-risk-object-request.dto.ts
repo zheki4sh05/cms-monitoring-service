@@ -38,6 +38,11 @@ export class CreateRiskObjectRequestDto {
   name!: string;
 
   @ApiProperty({
+    example: 'dep-1',
+  })
+  departmentId!: string;
+
+  @ApiProperty({
     type: () => RiskObjectDefinitionDto,
   })
   definition!: RiskObjectDefinitionDto;

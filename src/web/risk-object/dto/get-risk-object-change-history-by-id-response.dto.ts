@@ -13,6 +13,9 @@ export class GetRiskObjectChangeHistoryByIdResponseDto {
   @ApiProperty({ example: 'АО «Трастфлоу Логистик»' })
   riskObjectName!: string;
 
+  @ApiProperty({ example: 'dep-1' })
+  departmentId!: string;
+
   @ApiProperty({ example: 'Проверка документов: одобрено (#12)' })
   description!: string;
 

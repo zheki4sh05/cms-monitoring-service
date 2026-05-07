@@ -4,6 +4,9 @@ export class PutRiskObjectByIdRequestDto {
   @ApiProperty({ example: 'Название объекта' })
   name!: string;
 
+  @ApiProperty({ example: 'dep-1' })
+  departmentId!: string;
+
   @ApiProperty({
     type: 'object',
     additionalProperties: true,

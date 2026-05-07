@@ -5,6 +5,7 @@ export interface UpdateRiskObjectByIdInput {
   companyId: string;
   id: string;
   lastModifiedBy: string;
+  departmentId: string;
   name: string;
   definition: unknown;
   changeComment: string;
@@ -27,6 +28,10 @@ export class UpdateRiskObjectByIdUseCase {
       throw new DomainValidationError('name is required.');
     }
 
+    if (!input.departmentId?.trim()) {
+      throw new DomainValidationError('departmentId is required.');
+    }
+
     if (!input.definition || typeof input.definition !== 'object' || Array.isArray(input.definition)) {
       throw new DomainValidationError('definition must be a JSON object.');
     }
@@ -47,6 +52,7 @@ export class UpdateRiskObjectByIdUseCase {
       companyId: string;
       id: string;
       lastModifiedBy: string;
+      departmentId: string;
       name: string;
       definition: Record<string, unknown>;
       changeComment: string;
@@ -55,6 +61,7 @@ export class UpdateRiskObjectByIdUseCase {
       companyId: input.companyId.trim(),
       id: input.id.trim(),
       lastModifiedBy: input.lastModifiedBy.trim(),
+      departmentId: input.departmentId.trim(),
       name: input.name.trim(),
       definition: input.definition as Record<string, unknown>,
       changeComment: input.changeComment.trim(),

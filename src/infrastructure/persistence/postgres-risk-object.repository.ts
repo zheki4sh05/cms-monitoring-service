@@ -89,9 +89,21 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
     }));
   }
 
-  async getListPage(companyId: string, page: number, pageSize: number): Promise<RiskObjectListPage> {
+  async getListPage(
+    companyId: string,
+    page: number,
+    pageSize: number,
+    nameSubstring?: string,
+  ): Promise<RiskObjectListPage> {
     const offset = (page - 1) * pageSize;
     const limitWithLookahead = pageSize + 1;
+
+    const params: unknown[] = [limitWithLookahead, offset, companyId];
+    let whereClause = 'WHERE "companyId" = $3';
+    if (nameSubstring !== undefined && nameSubstring !== '') {
+      params.push(`%${nameSubstring}%`);
+      whereClause += ` AND name ILIKE $${params.length}`;
+    }
 
     const result = await this.pool.query<{
       id: string;
@@ -104,11 +116,11 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
       `
         SELECT id, code, name, "departmentId" AS "departmentId", active, "updatedAt"
         FROM risk_object
-        WHERE "companyId" = $3
+        ${whereClause}
         ORDER BY "updatedAt" DESC, id DESC
         LIMIT $1 OFFSET $2
       `,
-      [limitWithLookahead, offset, companyId],
+      params,
     );
 
     const hasMore = result.rows.length > pageSize;

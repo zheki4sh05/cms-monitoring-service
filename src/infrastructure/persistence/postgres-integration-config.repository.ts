@@ -64,9 +64,15 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
     return Number(result.rows[0]?.id ?? '0');
   }
 
-  async getListPage(companyId: string, page: number, pageSize: number): Promise<IntegrationConfigListPage> {
+  async getListPage(
+    companyId: string,
+    page: number,
+    pageSize: number,
+    nameSubstring?: string,
+  ): Promise<IntegrationConfigListPage> {
     const offset = (page - 1) * pageSize;
     const limitWithLookahead = pageSize + 1;
+    const searchQuery = nameSubstring ? `%${nameSubstring}%` : null;
 
     const result = await this.pool.query<{
       id: number;
@@ -92,10 +98,11 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
           "authorName" AS "authorName"
         FROM integration_config
         WHERE "companyId" = $3
+          AND ($4::text IS NULL OR name ILIKE $4)
         ORDER BY "updatedAt" DESC, id DESC
         LIMIT $1 OFFSET $2
       `,
-      [limitWithLookahead, offset, companyId],
+      [limitWithLookahead, offset, companyId, searchQuery],
     );
 
     const hasMore = result.rows.length > pageSize;

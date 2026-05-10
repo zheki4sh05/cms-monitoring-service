@@ -8,6 +8,8 @@ export interface GetRiskObjectsInput {
   companyId: string;
   page: number;
   pageSize: number;
+  /** Case-insensitive substring match on risk object name (optional). */
+  name?: string;
 }
 
 export interface GetRiskObjectsOutput {
@@ -31,6 +33,12 @@ export class GetRiskObjectsUseCase {
       throw new DomainValidationError('pageSize must be greater than or equal to 1.');
     }
 
-    return this.riskObjectRepository.getListPage(input.companyId.trim(), input.page, input.pageSize);
+    const nameFilter = input.name?.trim() ? input.name.trim() : undefined;
+    return this.riskObjectRepository.getListPage(
+      input.companyId.trim(),
+      input.page,
+      input.pageSize,
+      nameFilter,
+    );
   }
 }

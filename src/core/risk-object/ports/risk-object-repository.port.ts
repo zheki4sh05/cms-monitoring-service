@@ -75,7 +75,12 @@ export interface UpdateRiskObjectInput {
 export interface RiskObjectRepository {
   save(riskObject: RiskObject): Promise<void>;
   listModelsBrief(companyId: string): Promise<RiskObjectModelBrief[]>;
-  getListPage(companyId: string, page: number, pageSize: number): Promise<RiskObjectListPage>;
+  getListPage(
+    companyId: string,
+    page: number,
+    pageSize: number,
+    nameSubstring?: string,
+  ): Promise<RiskObjectListPage>;
   getChangeHistoryPage(
     companyId: string,
     page: number,

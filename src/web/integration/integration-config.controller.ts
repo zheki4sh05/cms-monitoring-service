@@ -136,6 +136,12 @@ export class IntegrationConfigController {
   @ApiHeader({ name: 'CompanyId', required: true, description: 'ID компании' })
   @ApiQuery({ name: 'page', required: true, example: 1 })
   @ApiQuery({ name: 'pageSize', required: true, example: 6 })
+  @ApiQuery({
+    name: 'name',
+    required: false,
+    description: 'Поиск по наименованию интеграции (подстрока, без учёта регистра)',
+    example: 'sap',
+  })
   @ApiOkResponse({ type: GetIntegrationConfigsResponseDto })
   @ApiBadRequestResponse({ description: 'Некорректные параметры или CompanyId' })
   @Get('integration-configs')
@@ -143,6 +149,7 @@ export class IntegrationConfigController {
     @Headers('companyid') companyIdHeader: string | undefined,
     @Query('page') pageQuery?: string,
     @Query('pageSize') pageSizeQuery?: string,
+    @Query('name') nameQuery?: string,
     @Req() request?: RequestWithAuthUser,
   ): Promise<GetIntegrationConfigsResponseDto> {
     await this.assertIntegrationPermission(request, 'VIEW_INTEGRATIONS_PAGE');
@@ -151,11 +158,13 @@ export class IntegrationConfigController {
     const pageSize = this.parseRequiredPositiveInt(pageSizeQuery, 'pageSize');
 
     try {
-      const result = await this.getIntegrationConfigsUseCase.execute({
+      const input = {
         companyId,
         page,
         pageSize,
-      });
+        ...(nameQuery !== undefined ? { name: nameQuery } : {}),
+      };
+      const result = await this.getIntegrationConfigsUseCase.execute(input);
 
       return {
         items: result.items.map((item) => ({

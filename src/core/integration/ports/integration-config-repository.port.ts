@@ -92,7 +92,12 @@ export interface IntegrationConfigProcessManagerItem {
 
 export interface IntegrationConfigRepository {
   save(config: IntegrationConfig): Promise<number>;
-  getListPage(companyId: string, page: number, pageSize: number): Promise<IntegrationConfigListPage>;
+  getListPage(
+    companyId: string,
+    page: number,
+    pageSize: number,
+    nameSubstring?: string,
+  ): Promise<IntegrationConfigListPage>;
   getChangeHistoryPage(
     companyId: string,
     page: number,

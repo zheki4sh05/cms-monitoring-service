@@ -188,6 +188,12 @@ export class RiskObjectController {
   @ApiHeader({ name: 'CompanyId', required: true, description: 'ID компании' })
   @ApiQuery({ name: 'page', required: true, example: 1 })
   @ApiQuery({ name: 'pageSize', required: true, example: 10 })
+  @ApiQuery({
+    name: 'name',
+    required: false,
+    description: 'Поиск по наименованию (подстрока, без учёта регистра)',
+    example: 'кредит',
+  })
   @ApiOkResponse({ type: GetRiskObjectsResponseDto })
   @ApiBadRequestResponse({ description: 'Некорректные параметры page/pageSize' })
   @Get('risk-objects')
@@ -195,13 +201,20 @@ export class RiskObjectController {
     @Headers('companyid') companyIdHeader: string | undefined,
     @Query('page') pageQuery?: string,
     @Query('pageSize') pageSizeQuery?: string,
+    @Query('name') nameQuery?: string,
   ): Promise<GetRiskObjectsResponseDto> {
     const companyId = this.parseRequiredHeader(companyIdHeader, 'CompanyId');
     const page = this.parseRequiredPositiveInt(pageQuery, 'page');
     const pageSize = this.parseRequiredPositiveInt(pageSizeQuery, 'pageSize');
 
     try {
-      const result = await this.getRiskObjectsUseCase.execute({ companyId, page, pageSize });
+      const input = {
+        companyId,
+        page,
+        pageSize,
+        ...(nameQuery !== undefined ? { name: nameQuery } : {}),
+      };
+      const result = await this.getRiskObjectsUseCase.execute(input);
       return {
         items: result.items.map((item) => ({
           id: item.id,

@@ -8,6 +8,7 @@ export interface GetIntegrationConfigsInput {
   companyId: string;
   page: number;
   pageSize: number;
+  name?: string;
 }
 
 export interface GetIntegrationConfigsOutput {
@@ -31,6 +32,12 @@ export class GetIntegrationConfigsUseCase {
       throw new DomainValidationError('pageSize must be greater than or equal to 1.');
     }
 
-    return this.integrationConfigRepository.getListPage(input.companyId.trim(), input.page, input.pageSize);
+    const nameFilter = input.name?.trim() ? input.name.trim() : undefined;
+    return this.integrationConfigRepository.getListPage(
+      input.companyId.trim(),
+      input.page,
+      input.pageSize,
+      nameFilter,
+    );
   }
 }

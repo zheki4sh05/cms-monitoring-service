@@ -12,6 +12,7 @@ import { GetIntegrationConfigChangeHistoryUseCase } from './core/integration/use
 import { GetIntegrationConfigsUseCase } from './core/integration/use-cases/get-integration-configs.use-case.js';
 import { UpdateIntegrationConfigByIdUseCase } from './core/integration/use-cases/update-integration-config-by-id.use-case.js';
 import { UpdateIntegrationConfigStatusUseCase } from './core/integration/use-cases/update-integration-config-status.use-case.js';
+import { GetMonitoringQueueStatisticsUseCase } from './core/monitoring-result/use-cases/get-monitoring-queue-statistics.use-case.js';
 import { TakeMonitoringResultByIdUseCase } from './core/monitoring-result/use-cases/take-monitoring-result-by-id.use-case.js';
 import { CreateRiskObjectUseCase } from './core/risk-object/use-cases/create-risk-object.use-case.js';
 import { GetRiskObjectChangeHistoryByIdUseCase } from './core/risk-object/use-cases/get-risk-object-change-history-by-id.use-case.js';
@@ -148,6 +149,7 @@ import { RiskObjectController } from './web/risk-object/risk-object.controller.j
         new UpdateIntegrationConfigStatusUseCase(integrationConfigRepository),
     },
     TakeMonitoringResultByIdUseCase,
+    GetMonitoringQueueStatisticsUseCase,
     {
       provide: GetRiskObjectChangeHistoryUseCase,
       inject: [RISK_OBJECT_REPOSITORY],

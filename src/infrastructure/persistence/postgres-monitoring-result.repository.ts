@@ -17,6 +17,13 @@ export interface MonitoringResultForProcessing {
   mappingRules: unknown;
 }
 
+export interface MonitoringResultStatisticsRow {
+  id: string;
+  riskObjectId: string;
+  riskObjectName: string;
+  processDate: Date;
+}
+
 @Injectable()
 export class PostgresMonitoringResultRepository {
   private readonly logger = new Logger(PostgresMonitoringResultRepository.name);
@@ -50,6 +57,35 @@ export class PostgresMonitoringResultRepository {
     }
 
     return id;
+  }
+
+  async listStatisticsRows(companyId: string): Promise<MonitoringResultStatisticsRow[]> {
+    const result = await this.pool.query<{
+      id: string;
+      riskObjectId: string;
+      riskObjectName: string;
+      processDate: Date;
+    }>(
+      `
+        SELECT
+          mr.id::text AS id,
+          mr."riskObjectId" AS "riskObjectId",
+          ro.name AS "riskObjectName",
+          mr.process_date AS "processDate"
+        FROM monitoring_result mr
+        INNER JOIN risk_object ro ON ro.id = mr."riskObjectId"
+        WHERE ro."companyId" = $1
+        ORDER BY mr.process_date DESC, mr.id ASC
+      `,
+      [companyId],
+    );
+
+    return result.rows.map((row) => ({
+      id: row.id,
+      riskObjectId: row.riskObjectId,
+      riskObjectName: row.riskObjectName,
+      processDate: new Date(row.processDate),
+    }));
   }
 
   async takeForProcessingById(id: string): Promise<MonitoringResultForProcessing | null> {

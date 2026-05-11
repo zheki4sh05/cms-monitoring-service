@@ -18,6 +18,13 @@ export interface MonitoringRetryItem {
   processDate: Date;
 }
 
+export interface MonitoringRetryStatisticsRow {
+  id: string;
+  riskObjectId: string;
+  riskObjectName: string;
+  processDate: Date;
+}
+
 @Injectable()
 export class PostgresMonitoringRetryRepository {
   constructor(@Inject(PG_POOL) private readonly pool: Pool) {}
@@ -45,6 +52,35 @@ export class PostgresMonitoringRetryRepository {
     }
 
     return id;
+  }
+
+  async listStatisticsRows(companyId: string): Promise<MonitoringRetryStatisticsRow[]> {
+    const result = await this.pool.query<{
+      id: string;
+      riskObjectId: string;
+      riskObjectName: string;
+      processDate: Date;
+    }>(
+      `
+        SELECT
+          mr.id::text AS id,
+          mr."riskObjectId" AS "riskObjectId",
+          ro.name AS "riskObjectName",
+          mr.process_date AS "processDate"
+        FROM monitoring_retry mr
+        INNER JOIN risk_object ro ON ro.id = mr."riskObjectId"
+        WHERE ro."companyId" = $1
+        ORDER BY mr.process_date ASC, mr.id ASC
+      `,
+      [companyId],
+    );
+
+    return result.rows.map((row) => ({
+      id: row.id,
+      riskObjectId: row.riskObjectId,
+      riskObjectName: row.riskObjectName,
+      processDate: new Date(row.processDate),
+    }));
   }
 
   async listPending(limit: number): Promise<MonitoringRetryItem[]> {

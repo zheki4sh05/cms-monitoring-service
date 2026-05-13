@@ -176,6 +176,11 @@ export class IntegrationConfigController {
           status: item.status,
           healt: this.resolveHealth(item.invocationsFailed, item.status),
           authorName: item.authorName,
+          riskObjectModel: {
+            id: item.riskObjectModelId,
+            name: item.riskObjectModelName,
+            isDeleted: item.riskObjectModelIsDeleted,
+          },
         })),
         hasMore: result.hasMore,
       };
@@ -231,6 +236,7 @@ export class IntegrationConfigController {
           configName: item.configName,
           description: item.description,
           authorName: item.authorName,
+          isDeleted: item.isDeleted,
         })),
         hasMore: result.hasMore,
       };
@@ -307,6 +313,7 @@ export class IntegrationConfigController {
         failed_comment: config.failedComment,
         authorName: config.authorName,
         updatedAt: config.updatedAt.toISOString(),
+        isDeleted: config.isDeleted,
       };
     } catch (error) {
       if (error instanceof DomainValidationError) {
@@ -370,6 +377,7 @@ export class IntegrationConfigController {
         failed_comment: config.failedComment,
         authorName: config.authorName,
         updatedAt: config.updatedAt.toISOString(),
+        isDeleted: config.isDeleted,
       };
     } catch (error) {
       if (error instanceof DomainValidationError) {
@@ -466,6 +474,7 @@ export class IntegrationConfigController {
       const deletedAt = await this.deleteIntegrationConfigByIdUseCase.execute({
         companyId,
         integrationConfigId,
+        authorName: request?.authenticatedUser?.username?.trim() || 'Unknown',
       });
 
       if (!deletedAt) {

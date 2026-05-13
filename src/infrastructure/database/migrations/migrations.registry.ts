@@ -22,6 +22,8 @@ import { addIntegrationIdToMonitoringResultMigration } from './202604251740-add-
 import { changeMonitoringIdsToUuidMigration } from './202604251800-change-monitoring-ids-to-uuid.migration.js';
 import { enforceMonitoringUuidPrimaryKeysMigration } from './202604251820-enforce-monitoring-uuid-primary-keys.migration.js';
 import { addDepartmentIdToRiskObjectMigration } from './202605071600-add-department-id-to-risk-object.migration.js';
+import { dropRiskObjectHistoryFkMigration } from './202605131200-drop-risk-object-history-fk.migration.js';
+import { dropIntegrationHistoryFkMigration } from './202605131300-drop-integration-history-fk.migration.js';
 import type { Migration } from './migration.interface.js';
 
 export const MIGRATIONS: Migration[] = [
@@ -49,4 +51,6 @@ export const MIGRATIONS: Migration[] = [
   enforceMonitoringUuidPrimaryKeysMigration,
   addDepartmentIdToRiskObjectMigration,
   addUuidColumnToRiskObjectMigration,
+  dropRiskObjectHistoryFkMigration,
+  dropIntegrationHistoryFkMigration,
 ];

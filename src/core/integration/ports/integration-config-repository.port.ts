@@ -18,6 +18,7 @@ export interface IntegrationConfigListItem {
   invocationsFailed: number;
   failedComment: string[];
   authorName: string;
+  riskObjectModelId: string;
 }
 
 export interface IntegrationConfigListPage {
@@ -32,6 +33,7 @@ export interface IntegrationConfigHistoryItem {
   configName: string;
   description: string;
   authorName: string;
+  isDeleted: boolean;
 }
 
 export interface IntegrationConfigHistoryPage {
@@ -55,6 +57,7 @@ export interface IntegrationConfigDetails {
   failedComment: string[];
   authorName: string;
   updatedAt: Date;
+  isDeleted?: boolean;
 }
 
 export interface IntegrationInvocationStats {
@@ -128,5 +131,7 @@ export interface IntegrationConfigRepository {
     success: boolean,
     errorMessage?: string,
   ): Promise<IntegrationInvocationStats | null>;
-  deleteById(companyId: string, id: number): Promise<Date | null>;
+  deleteById(companyId: string, id: number, authorName: string): Promise<Date | null>;
+  getLatestSnapshotFromHistory(companyId: string, integrationId: number): Promise<IntegrationConfigDetails | null>;
+  findLiveIntegrationConfigIds(companyId: string, integrationIds: number[]): Promise<Set<number>>;
 }

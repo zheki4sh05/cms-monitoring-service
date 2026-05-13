@@ -15,6 +15,7 @@ import { UpdateIntegrationConfigStatusUseCase } from './core/integration/use-cas
 import { GetMonitoringQueueStatisticsUseCase } from './core/monitoring-result/use-cases/get-monitoring-queue-statistics.use-case.js';
 import { TakeMonitoringResultByIdUseCase } from './core/monitoring-result/use-cases/take-monitoring-result-by-id.use-case.js';
 import { CreateRiskObjectUseCase } from './core/risk-object/use-cases/create-risk-object.use-case.js';
+import { DeleteRiskObjectByIdUseCase } from './core/risk-object/use-cases/delete-risk-object-by-id.use-case.js';
 import { GetRiskObjectChangeHistoryByIdUseCase } from './core/risk-object/use-cases/get-risk-object-change-history-by-id.use-case.js';
 import { GetRiskObjectChangeHistoryUseCase } from './core/risk-object/use-cases/get-risk-object-change-history.use-case.js';
 import { GetRiskObjectByIdUseCase } from './core/risk-object/use-cases/get-risk-object-by-id.use-case.js';
@@ -120,9 +121,11 @@ import { RiskObjectController } from './web/risk-object/risk-object.controller.j
     },
     {
       provide: GetIntegrationConfigsUseCase,
-      inject: [INTEGRATION_CONFIG_REPOSITORY],
-      useFactory: (integrationConfigRepository: IntegrationConfigRepository) =>
-        new GetIntegrationConfigsUseCase(integrationConfigRepository),
+      inject: [INTEGRATION_CONFIG_REPOSITORY, RISK_OBJECT_REPOSITORY],
+      useFactory: (
+        integrationConfigRepository: IntegrationConfigRepository,
+        riskObjectRepository: RiskObjectRepository,
+      ) => new GetIntegrationConfigsUseCase(integrationConfigRepository, riskObjectRepository),
     },
     {
       provide: GetIntegrationConfigChangeHistoryUseCase,
@@ -197,6 +200,12 @@ import { RiskObjectController } from './web/risk-object/risk-object.controller.j
       inject: [RISK_OBJECT_REPOSITORY],
       useFactory: (riskObjectRepository: RiskObjectRepository) =>
         new UpdateRiskObjectStatusUseCase(riskObjectRepository),
+    },
+    {
+      provide: DeleteRiskObjectByIdUseCase,
+      inject: [RISK_OBJECT_REPOSITORY],
+      useFactory: (riskObjectRepository: RiskObjectRepository) =>
+        new DeleteRiskObjectByIdUseCase(riskObjectRepository),
     },
   ],
 })

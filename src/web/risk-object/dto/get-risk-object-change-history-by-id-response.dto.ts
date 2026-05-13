@@ -21,4 +21,10 @@ export class GetRiskObjectChangeHistoryByIdResponseDto {
 
   @ApiProperty({ example: 'Иван Сидоров' })
   authorName!: string;
+
+  @ApiProperty({
+    example: false,
+    description: 'true, если рисковый объект отсутствует в основной таблице на момент запроса',
+  })
+  isDeleted!: boolean;
 }

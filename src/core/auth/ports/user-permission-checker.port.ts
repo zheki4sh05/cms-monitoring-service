@@ -1,4 +1,7 @@
-export type UserPermission = 'MANAGE_INTEGRATIONS' | 'VIEW_INTEGRATIONS_PAGE';
+export type UserPermission =
+  | 'MANAGE_INTEGRATIONS'
+  | 'VIEW_INTEGRATIONS_PAGE'
+  | 'MANAGE_RISK_OBJECTS';
 
 export interface CheckUserPermissionInput {
   userId: string;

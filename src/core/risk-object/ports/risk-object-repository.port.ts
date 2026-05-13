@@ -11,6 +11,7 @@ export interface RiskObjectListItem {
   departmentId: string;
   status: RiskObjectStatus;
   updatedAt: Date;
+  isDeleted: boolean;
 }
 
 export interface RiskObjectListPage {
@@ -23,6 +24,7 @@ export interface RiskObjectModelBrief {
   uuid: string;
   name: string;
   departmentId: string;
+  isDeleted: boolean;
 }
 
 export interface RiskObjectChangeHistoryItem {
@@ -33,6 +35,7 @@ export interface RiskObjectChangeHistoryItem {
   changeComment: string;
   status: RiskObjectStatus;
   changedAt: Date;
+  isDeleted: boolean;
 }
 
 export interface RiskObjectChangeHistoryPage {
@@ -48,6 +51,7 @@ export interface RiskObjectChangeHistoryDetails {
   departmentId: string;
   description: string;
   authorName: string;
+  isDeleted: boolean;
 }
 
 export interface RiskObjectDetails {
@@ -59,6 +63,7 @@ export interface RiskObjectDetails {
   status: RiskObjectStatus;
   updatedAt: Date;
   definition: Record<string, unknown>;
+  isDeleted?: boolean;
 }
 
 export interface UpdateRiskObjectInput {
@@ -93,6 +98,11 @@ export interface RiskObjectRepository {
   ): Promise<RiskObjectChangeHistoryDetails | null>;
   getById(companyId: string, id: string): Promise<RiskObjectDetails | null>;
   getByUuid(companyId: string, uuid: string): Promise<RiskObjectDetails | null>;
+  getLatestSnapshotFromHistory(companyId: string, riskObjectId: string): Promise<RiskObjectDetails | null>;
+  findLiveRiskObjectIds(companyId: string, riskObjectIds: string[]): Promise<Set<string>>;
+  findRiskObjectNamesByIds(companyId: string, riskObjectIds: string[]): Promise<Map<string, string>>;
+  findLatestRiskObjectNamesFromHistory(companyId: string, riskObjectIds: string[]): Promise<Map<string, string>>;
   updateById(input: UpdateRiskObjectInput): Promise<Date | null>;
   updateStatusById(companyId: string, id: string, status: RiskObjectStatus): Promise<Date | null>;
+  deleteById(companyId: string, id: string, authorName: string): Promise<Date | null>;
 }

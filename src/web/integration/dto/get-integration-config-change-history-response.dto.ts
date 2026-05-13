@@ -18,6 +18,12 @@ export class IntegrationConfigChangeHistoryItemDto {
 
   @ApiProperty({ example: 'Мария Петрова' })
   authorName!: string;
+
+  @ApiProperty({
+    example: false,
+    description: 'true, если интеграция отсутствует в integration_config (удалена), но запись истории сохранена',
+  })
+  isDeleted!: boolean;
 }
 
 export class GetIntegrationConfigChangeHistoryResponseDto {

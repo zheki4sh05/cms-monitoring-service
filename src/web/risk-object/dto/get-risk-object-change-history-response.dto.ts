@@ -21,6 +21,12 @@ export class RiskObjectChangeHistoryItemDto {
 
   @ApiProperty({ example: '2026-04-13T10:10:10.000Z' })
   changedAt!: string;
+
+  @ApiProperty({
+    example: false,
+    description: 'true, если рисковый объект с указанным riskObjectId отсутствует в основной таблице',
+  })
+  isDeleted!: boolean;
 }
 
 export class GetRiskObjectChangeHistoryResponseDto {

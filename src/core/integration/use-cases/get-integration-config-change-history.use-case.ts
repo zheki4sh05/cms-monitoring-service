@@ -35,11 +35,29 @@ export class GetIntegrationConfigChangeHistoryUseCase {
     }
 
     const q = input.q?.trim();
-    return this.integrationConfigRepository.getChangeHistoryPage(
-      input.companyId.trim(),
+    const companyId = input.companyId.trim();
+
+    const page = await this.integrationConfigRepository.getChangeHistoryPage(
+      companyId,
       input.page,
       input.pageSize,
       q ? q : undefined,
     );
+
+    const integrationIds = [...new Set(page.items.map((i) => i.integrationId))];
+    const liveIds = await this.integrationConfigRepository.findLiveIntegrationConfigIds(
+      companyId,
+      integrationIds,
+    );
+
+    const items: IntegrationConfigHistoryItem[] = page.items.map((item) => ({
+      ...item,
+      isDeleted: !liveIds.has(item.integrationId),
+    }));
+
+    return {
+      items,
+      hasMore: page.hasMore,
+    };
   }
 }

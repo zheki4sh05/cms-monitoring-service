@@ -12,6 +12,9 @@ export class RiskObjectModelBriefDto {
 
   @ApiProperty({ example: 'dep-1' })
   departmentId!: string;
+
+  @ApiProperty({ example: false, description: 'Для списка моделей всегда false' })
+  isDeleted!: boolean;
 }
 
 export class GetRiskObjectModelsResponseDto {

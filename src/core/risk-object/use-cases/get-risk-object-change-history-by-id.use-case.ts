@@ -9,10 +9,12 @@ export interface GetRiskObjectChangeHistoryByIdInput {
   historyId: string;
 }
 
+export type GetRiskObjectChangeHistoryByIdResult = RiskObjectChangeHistoryDetails;
+
 export class GetRiskObjectChangeHistoryByIdUseCase {
   constructor(private readonly riskObjectRepository: RiskObjectRepository) {}
 
-  async execute(input: GetRiskObjectChangeHistoryByIdInput): Promise<RiskObjectChangeHistoryDetails | null> {
+  async execute(input: GetRiskObjectChangeHistoryByIdInput): Promise<GetRiskObjectChangeHistoryByIdResult | null> {
     if (!input.companyId?.trim()) {
       throw new DomainValidationError('companyId is required.');
     }
@@ -22,7 +24,17 @@ export class GetRiskObjectChangeHistoryByIdUseCase {
     }
 
     const parsedHistoryId = this.parseHistoryId(input.historyId.trim());
-    return this.riskObjectRepository.getChangeHistoryById(input.companyId.trim(), parsedHistoryId);
+    const companyId = input.companyId.trim();
+    const details = await this.riskObjectRepository.getChangeHistoryById(companyId, parsedHistoryId);
+    if (!details) {
+      return null;
+    }
+
+    const liveIds = await this.riskObjectRepository.findLiveRiskObjectIds(companyId, [details.riskObjectId]);
+    return {
+      ...details,
+      isDeleted: !liveIds.has(details.riskObjectId),
+    };
   }
 
   private parseHistoryId(value: string): number {

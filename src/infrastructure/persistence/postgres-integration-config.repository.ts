@@ -84,6 +84,7 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
       invocationsFailed: number;
       failedComment: unknown;
       authorName: string;
+      riskObjectModelId: string;
     }>(
       `
         SELECT
@@ -95,7 +96,8 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
           "invocationsSuccess" AS "invocationsSuccess",
           "invocationsFailed" AS "invocationsFailed",
           "failedComment" AS "failedComment",
-          "authorName" AS "authorName"
+          "authorName" AS "authorName",
+          "riskObjectId" AS "riskObjectModelId"
         FROM integration_config
         WHERE "companyId" = $3
           AND ($4::text IS NULL OR name ILIKE $4)
@@ -120,6 +122,7 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
         invocationsFailed: row.invocationsFailed,
         failedComment: this.parseStringArray(row.failedComment),
         authorName: row.authorName,
+        riskObjectModelId: row.riskObjectModelId,
       })),
       hasMore,
     };
@@ -171,6 +174,7 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
         configName: row.configName,
         description: row.description,
         authorName: row.authorName,
+        isDeleted: false,
       })),
       hasMore,
     };
@@ -362,7 +366,7 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
           this.stringifyJson(currentRow.mappingRules),
           this.stringifyJson(currentRow.pullConfig),
           currentRow.active,
-          input.authorName,
+          currentRow.authorName,
           input.changeComment,
           currentRow.createdAt,
           currentRow.updatedAt,
@@ -577,24 +581,197 @@ export class PostgresIntegrationConfigRepository implements IntegrationConfigRep
     };
   }
 
-  async deleteById(companyId: string, id: number): Promise<Date | null> {
+  async deleteById(companyId: string, id: number, authorName: string): Promise<Date | null> {
     this.logger.log(`Deleting integration config from DB (companyId=${companyId}, id=${id})`);
-    const result = await this.pool.query<{ deletedAt: Date }>(
+    const client = await this.pool.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      const currentResult = await client.query<{
+        id: number;
+        companyId: string;
+        name: string;
+        integrationKind: 'PUSH' | 'PULL' | 'BROKER';
+        endpointUrl: string;
+        riskObjectId: string;
+        mappingRules: unknown;
+        pullConfig: PullConfig | null;
+        active: boolean;
+        status: IntegrationRuntimeStatus;
+        authorName: string;
+        createdAt: Date;
+        updatedAt: Date;
+      }>(
+        `
+          SELECT
+            id,
+            "companyId" AS "companyId",
+            name,
+            "integrationKind" AS "integrationKind",
+            "endpointUrl" AS "endpointUrl",
+            "riskObjectId" AS "riskObjectId",
+            "mappingRules" AS "mappingRules",
+            "pullConfig" AS "pullConfig",
+            active,
+            status,
+            "authorName" AS "authorName",
+            "createdAt" AS "createdAt",
+            "updatedAt" AS "updatedAt"
+          FROM integration_config
+          WHERE "companyId" = $1 AND id = $2
+          FOR UPDATE
+        `,
+        [companyId, id],
+      );
+
+      const currentRow = currentResult.rows[0];
+      if (!currentRow) {
+        await client.query('ROLLBACK');
+        this.logger.warn(`Integration config not found for deletion (companyId=${companyId}, id=${id})`);
+        return null;
+      }
+
+      await client.query(
+        `
+          INSERT INTO integration_history (
+            "integrationId",
+            "companyId",
+            name,
+            "integrationKind",
+            "endpointUrl",
+            "riskObjectId",
+            "mappingRules",
+            "pullConfig",
+            active,
+            "authorName",
+            "changeComment",
+            "createdAt",
+            "updatedAt",
+            "changedAt"
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9, $10, $11, $12, $13, NOW())
+        `,
+        [
+          currentRow.id,
+          currentRow.companyId,
+          currentRow.name,
+          currentRow.integrationKind,
+          currentRow.endpointUrl,
+          currentRow.riskObjectId,
+          this.stringifyJson(currentRow.mappingRules),
+          this.stringifyJson(currentRow.pullConfig),
+          currentRow.active,
+          authorName,
+          'Удаление интеграции',
+          currentRow.createdAt,
+          currentRow.updatedAt,
+        ],
+      );
+
+      const deleteResult = await client.query<{ deletedAt: Date }>(
+        `
+          DELETE FROM integration_config
+          WHERE "companyId" = $1 AND id = $2
+          RETURNING NOW() AS "deletedAt"
+        `,
+        [companyId, id],
+      );
+
+      await client.query('COMMIT');
+      const deletedRow = deleteResult.rows[0];
+      return deletedRow ? new Date(deletedRow.deletedAt) : null;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      this.logger.error(
+        `Deleting integration config rolled back (companyId=${companyId}, id=${id}): ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async findLiveIntegrationConfigIds(companyId: string, integrationIds: number[]): Promise<Set<number>> {
+    if (integrationIds.length === 0) {
+      return new Set();
+    }
+
+    const result = await this.pool.query<{ id: number }>(
       `
-        DELETE FROM integration_config
-        WHERE "companyId" = $1 AND id = $2
-        RETURNING NOW() AS "deletedAt"
+        SELECT id
+        FROM integration_config
+        WHERE "companyId" = $1 AND id = ANY($2::bigint[])
       `,
-      [companyId, id],
+      [companyId, integrationIds],
     );
 
-    const deletedRow = result.rows[0];
-    if (!deletedRow) {
-      this.logger.warn(`Integration config not found for deletion (companyId=${companyId}, id=${id})`);
+    return new Set(result.rows.map((r) => r.id));
+  }
+
+  async getLatestSnapshotFromHistory(
+    companyId: string,
+    integrationId: number,
+  ): Promise<IntegrationConfigDetails | null> {
+    const result = await this.pool.query<{
+      integrationId: number;
+      companyId: string;
+      name: string;
+      integrationKind: 'PUSH' | 'PULL' | 'BROKER';
+      endpointUrl: string;
+      riskObjectId: string;
+      mappingRules: unknown;
+      pullConfig: PullConfig | null;
+      active: boolean;
+      authorName: string;
+      createdAt: Date;
+      updatedAt: Date;
+    }>(
+      `
+        SELECT
+          "integrationId" AS "integrationId",
+          "companyId" AS "companyId",
+          name,
+          "integrationKind" AS "integrationKind",
+          "endpointUrl" AS "endpointUrl",
+          "riskObjectId" AS "riskObjectId",
+          "mappingRules" AS "mappingRules",
+          "pullConfig" AS "pullConfig",
+          active,
+          "authorName" AS "authorName",
+          "createdAt" AS "createdAt",
+          "updatedAt" AS "updatedAt"
+        FROM integration_history
+        WHERE "companyId" = $1 AND "integrationId" = $2
+        ORDER BY "changedAt" DESC, id DESC
+        LIMIT 1
+      `,
+      [companyId, integrationId],
+    );
+
+    const row = result.rows[0];
+    if (!row) {
       return null;
     }
 
-    return new Date(deletedRow.deletedAt);
+    return {
+      id: row.integrationId,
+      number: row.integrationId,
+      name: row.name,
+      integrationKind: row.integrationKind,
+      endpointUrl: row.endpointUrl,
+      riskObjectModelId: row.riskObjectId,
+      mappingRules: row.mappingRules,
+      pullConfig: row.pullConfig ?? null,
+      active: row.active,
+      status: 'idle',
+      invocationsSuccess: 0,
+      invocationsFailed: 0,
+      failedComment: [],
+      authorName: row.authorName,
+      updatedAt: new Date(row.updatedAt),
+      isDeleted: true,
+    };
   }
 
   private stringifyJson(value: unknown): string | null {

@@ -18,6 +18,9 @@ export class RiskObjectListItemDto {
 
   @ApiProperty({ example: '2026-04-12T10:15:00.000Z' })
   updatedAt!: string;
+
+  @ApiProperty({ example: false, description: 'Для списка всегда false (только действующие объекты)' })
+  isDeleted!: boolean;
 }
 
 export class GetRiskObjectsResponseDto {

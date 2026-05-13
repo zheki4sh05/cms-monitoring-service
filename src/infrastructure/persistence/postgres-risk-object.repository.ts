@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { Pool } from 'pg';
+import { DatabaseError, Pool } from 'pg';
 import type { PoolClient } from 'pg';
+import { RiskObjectDeleteBlockedError } from '../../core/risk-object/errors/risk-object-delete-blocked.error.js';
 import type { RiskObject } from '../../core/risk-object/domain/risk-object.js';
 import type {
   RiskObjectChangeHistoryDetails,
@@ -86,6 +87,7 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
       uuid: row.uuid,
       name: row.name,
       departmentId: row.departmentId,
+      isDeleted: false,
     }));
   }
 
@@ -134,6 +136,7 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
         departmentId: row.departmentId,
         status: row.active ? 'active' : 'archived',
         updatedAt: new Date(row.updatedAt),
+        isDeleted: false,
       })),
       hasMore,
     };
@@ -181,6 +184,7 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
       departmentId: row.departmentId,
       description: row.description,
       authorName: row.authorName,
+      isDeleted: false,
     };
   }
 
@@ -233,6 +237,7 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
         changeComment: row.changeComment,
         status: row.active ? 'active' : 'archived',
         changedAt: new Date(row.changedAt),
+        isDeleted: false,
       })),
       hasMore,
     };
@@ -467,6 +472,108 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
     return updatedRow ? new Date(updatedRow.updatedAt) : null;
   }
 
+  async deleteById(companyId: string, id: string, authorName: string): Promise<Date | null> {
+    this.logger.log(`Deleting risk object from DB (companyId=${companyId}, id=${id})`);
+    const client = await this.pool.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      const currentResult = await client.query<{
+        id: string;
+        companyId: string;
+        departmentId: string;
+        code: string;
+        name: string;
+        definition: Record<string, unknown>;
+        active: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+      }>(
+        `
+          SELECT
+            id,
+            "companyId" AS "companyId",
+            "departmentId" AS "departmentId",
+            code,
+            name,
+            definition,
+            active,
+            "createdAt" AS "createdAt",
+            "updatedAt" AS "updatedAt"
+          FROM risk_object
+          WHERE "companyId" = $1 AND id = $2
+          FOR UPDATE
+        `,
+        [companyId, id],
+      );
+
+      const currentRow = currentResult.rows[0];
+      if (!currentRow) {
+        await client.query('ROLLBACK');
+        this.logger.warn(`Risk object not found for deletion (companyId=${companyId}, id=${id})`);
+        return null;
+      }
+
+      await client.query(
+        `
+          INSERT INTO risk_object_history (
+            "riskObjectId",
+            "companyId",
+            "departmentId",
+            code,
+            name,
+            definition,
+            active,
+            "createdAt",
+            "updatedAt",
+            "changeComment",
+            "authorName",
+            "changedAt"
+          )
+          VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10, $11, NOW())
+        `,
+        [
+          currentRow.id,
+          currentRow.companyId,
+          currentRow.departmentId,
+          currentRow.code,
+          currentRow.name,
+          JSON.stringify(currentRow.definition),
+          currentRow.active,
+          currentRow.createdAt,
+          currentRow.updatedAt,
+          'Удаление рискового объекта',
+          authorName,
+        ],
+      );
+
+      const deleteResult = await client.query<{ deletedAt: Date }>(
+        `
+          DELETE FROM risk_object
+          WHERE "companyId" = $1 AND id = $2
+          RETURNING NOW() AS "deletedAt"
+        `,
+        [companyId, id],
+      );
+
+      await client.query('COMMIT');
+      const deletedRow = deleteResult.rows[0];
+      return deletedRow ? new Date(deletedRow.deletedAt) : null;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      if (error instanceof DatabaseError && error.code === '23503') {
+        this.logger.warn(
+          `Risk object delete blocked by foreign key (companyId=${companyId}, id=${id}, constraint=${error.constraint ?? 'unknown'})`,
+        );
+        throw new RiskObjectDeleteBlockedError();
+      }
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   async getByIdForOutboxProcessing(
     companyId: string,
     id: string,
@@ -500,6 +607,106 @@ export class PostgresRiskObjectRepository implements RiskObjectRepository {
       active: row.active,
       authorId: row.authorId,
       lastModifiedBy: row.lastModifiedBy,
+    };
+  }
+
+  async findLiveRiskObjectIds(companyId: string, riskObjectIds: string[]): Promise<Set<string>> {
+    if (riskObjectIds.length === 0) {
+      return new Set();
+    }
+
+    const result = await this.pool.query<{ id: string }>(
+      `
+        SELECT id
+        FROM risk_object
+        WHERE "companyId" = $1 AND id = ANY($2::varchar[])
+      `,
+      [companyId, riskObjectIds],
+    );
+
+    return new Set(result.rows.map((r) => r.id));
+  }
+
+  async findRiskObjectNamesByIds(companyId: string, riskObjectIds: string[]): Promise<Map<string, string>> {
+    if (riskObjectIds.length === 0) {
+      return new Map();
+    }
+
+    const result = await this.pool.query<{ id: string; name: string }>(
+      `
+        SELECT id, name
+        FROM risk_object
+        WHERE "companyId" = $1 AND id = ANY($2::varchar[])
+      `,
+      [companyId, riskObjectIds],
+    );
+
+    return new Map(result.rows.map((r) => [r.id, r.name]));
+  }
+
+  async findLatestRiskObjectNamesFromHistory(
+    companyId: string,
+    riskObjectIds: string[],
+  ): Promise<Map<string, string>> {
+    if (riskObjectIds.length === 0) {
+      return new Map();
+    }
+
+    const result = await this.pool.query<{ riskObjectId: string; name: string }>(
+      `
+        SELECT DISTINCT ON ("riskObjectId") "riskObjectId", name
+        FROM risk_object_history
+        WHERE "companyId" = $1 AND "riskObjectId" = ANY($2::varchar[])
+        ORDER BY "riskObjectId", "changedAt" DESC, id DESC
+      `,
+      [companyId, riskObjectIds],
+    );
+
+    return new Map(result.rows.map((r) => [r.riskObjectId, r.name]));
+  }
+
+  async getLatestSnapshotFromHistory(companyId: string, riskObjectId: string): Promise<RiskObjectDetails | null> {
+    const result = await this.pool.query<{
+      riskObjectId: string;
+      code: string;
+      name: string;
+      departmentId: string;
+      definition: Record<string, unknown>;
+      active: boolean;
+      updatedAt: Date;
+    }>(
+      `
+        SELECT
+          "riskObjectId" AS "riskObjectId",
+          code,
+          name,
+          "departmentId" AS "departmentId",
+          definition,
+          active,
+          "updatedAt" AS "updatedAt"
+        FROM risk_object_history
+        WHERE "companyId" = $1 AND "riskObjectId" = $2
+        ORDER BY "changedAt" DESC, id DESC
+        LIMIT 1
+      `,
+      [companyId, riskObjectId],
+    );
+
+    const row = result.rows[0];
+    if (!row) {
+      return null;
+    }
+
+    return {
+      id: row.riskObjectId,
+      uuid: row.riskObjectId,
+      code: row.code,
+      name: row.name,
+      departmentId: row.departmentId,
+      status: row.active ? 'active' : 'archived',
+      updatedAt: new Date(row.updatedAt),
+      definition: row.definition ?? {},
+      isDeleted: true,
     };
   }
 

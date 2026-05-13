@@ -106,4 +106,10 @@ export class GetIntegrationConfigByIdResponseDto {
 
   @ApiProperty({ example: '2026-04-12T08:20:00.000Z' })
   updatedAt!: string;
+
+  @ApiProperty({
+    example: false,
+    description: 'true, если интеграция удалена из основной таблицы (ответ восстановлен из истории изменений)',
+  })
+  isDeleted!: boolean;
 }

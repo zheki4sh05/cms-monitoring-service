@@ -1,9 +1,12 @@
 import {
   BadRequestException,
   Body,
+  ConflictException,
   Controller,
+  Delete,
   Get,
   Headers,
+  Inject,
   Logger,
   NotFoundException,
   Param,
@@ -11,11 +14,13 @@ import {
   Put,
   Query,
   Req,
+  UnauthorizedException,
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
   ApiBody,
+  ApiConflictResponse,
   ApiCreatedResponse,
   ApiHeader,
   ApiNotFoundResponse,
@@ -25,7 +30,13 @@ import {
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
+import {
+  USER_PERMISSION_CHECKER,
+  type UserPermissionChecker,
+} from '../../core/auth/ports/user-permission-checker.port.js';
+import { RiskObjectDeleteBlockedError } from '../../core/risk-object/errors/risk-object-delete-blocked.error.js';
 import { CreateRiskObjectUseCase } from '../../core/risk-object/use-cases/create-risk-object.use-case.js';
+import { DeleteRiskObjectByIdUseCase } from '../../core/risk-object/use-cases/delete-risk-object-by-id.use-case.js';
 import { GetRiskObjectChangeHistoryByIdUseCase } from '../../core/risk-object/use-cases/get-risk-object-change-history-by-id.use-case.js';
 import { GetRiskObjectChangeHistoryUseCase } from '../../core/risk-object/use-cases/get-risk-object-change-history.use-case.js';
 import { GetRiskObjectByIdUseCase } from '../../core/risk-object/use-cases/get-risk-object-by-id.use-case.js';
@@ -39,6 +50,7 @@ import { DomainValidationError } from '../../core/shared/errors/domain-validatio
 import { CreateRiskObjectRequestDto } from './dto/create-risk-object-request.dto.js';
 import { GetRiskObjectChangeHistoryByIdResponseDto } from './dto/get-risk-object-change-history-by-id-response.dto.js';
 import { CreateRiskObjectResponseDto } from './dto/create-risk-object-response.dto.js';
+import { DeleteRiskObjectByIdResponseDto } from './dto/delete-risk-object-by-id-response.dto.js';
 import { GetRiskObjectChangeHistoryResponseDto } from './dto/get-risk-object-change-history-response.dto.js';
 import { GetRiskObjectByIdResponseDto } from './dto/get-risk-object-by-id-response.dto.js';
 import { GetRiskObjectModelsResponseDto } from './dto/get-risk-object-models-response.dto.js';
@@ -61,6 +73,7 @@ export class RiskObjectController {
 
   constructor(
     private readonly createRiskObjectUseCase: CreateRiskObjectUseCase,
+    private readonly deleteRiskObjectByIdUseCase: DeleteRiskObjectByIdUseCase,
     private readonly getRiskObjectChangeHistoryUseCase: GetRiskObjectChangeHistoryUseCase,
     private readonly getRiskObjectChangeHistoryByIdUseCase: GetRiskObjectChangeHistoryByIdUseCase,
     private readonly getRiskObjectModelsUseCase: GetRiskObjectModelsUseCase,
@@ -69,6 +82,8 @@ export class RiskObjectController {
     private readonly getRiskObjectByUuidUseCase: GetRiskObjectByUuidUseCase,
     private readonly updateRiskObjectByIdUseCase: UpdateRiskObjectByIdUseCase,
     private readonly updateRiskObjectStatusUseCase: UpdateRiskObjectStatusUseCase,
+    @Inject(USER_PERMISSION_CHECKER)
+    private readonly userPermissionChecker: UserPermissionChecker,
   ) {}
 
   @ApiOperation({ summary: 'Создать рисковый объект' })
@@ -151,6 +166,7 @@ export class RiskObjectController {
           changeComment: item.changeComment,
           status: item.status,
           changedAt: item.changedAt.toISOString(),
+          isDeleted: item.isDeleted,
         })),
         hasMore: result.hasMore,
       };
@@ -223,6 +239,7 @@ export class RiskObjectController {
           departmentId: item.departmentId,
           status: item.status,
           updatedAt: item.updatedAt.toISOString(),
+          isDeleted: item.isDeleted,
         })),
         hasMore: result.hasMore,
       };
@@ -267,6 +284,7 @@ export class RiskObjectController {
         status: riskObject.status,
         updatedAt: riskObject.updatedAt.toISOString(),
         definition: JSON.stringify(riskObject.definition),
+        isDeleted: riskObject.isDeleted,
       };
     } catch (error) {
       if (error instanceof DomainValidationError) {
@@ -343,6 +361,7 @@ export class RiskObjectController {
         status: riskObject.status,
         updatedAt: riskObject.updatedAt.toISOString(),
         definition: JSON.stringify(riskObject.definition),
+        isDeleted: false,
       };
     } catch (error) {
       if (error instanceof DomainValidationError) {
@@ -412,6 +431,53 @@ export class RiskObjectController {
     } catch (error) {
       if (error instanceof DomainValidationError) {
         throw new BadRequestException(error.message);
+      }
+
+      throw error;
+    }
+  }
+
+  @ApiOperation({ summary: 'Удаление рискового объекта по id' })
+  @ApiHeader({ name: 'CompanyId', required: true, description: 'ID компании' })
+  @ApiParam({ name: 'id', required: true, example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890' })
+  @ApiOkResponse({ type: DeleteRiskObjectByIdResponseDto })
+  @ApiNotFoundResponse({ description: 'Рисковый объект не найден' })
+  @ApiBadRequestResponse({ description: 'Некорректный id или CompanyId' })
+  @ApiConflictResponse({
+    description: 'Удаление невозможно: объект связан с результатами или повторными попытками мониторинга',
+  })
+  @Delete('risk-objects/:id')
+  async deleteRiskObjectById(
+    @Headers('companyid') companyIdHeader: string | undefined,
+    @Param('id') id: string | undefined,
+    @Req() request: RequestWithAuthUser,
+  ): Promise<DeleteRiskObjectByIdResponseDto> {
+    await this.assertManageRiskObjectsPermission(request);
+    const companyId = this.parseRequiredHeader(companyIdHeader, 'CompanyId');
+    const riskObjectId = this.parseRequiredHeader(id, 'id');
+
+    try {
+      const deletedAt = await this.deleteRiskObjectByIdUseCase.execute({
+        companyId,
+        id: riskObjectId,
+        authorName: request.authenticatedUser?.username?.trim() || 'Unknown',
+      });
+
+      if (!deletedAt) {
+        throw new NotFoundException('Risk object not found.');
+      }
+
+      return {
+        id: riskObjectId,
+        deletedAt: deletedAt.toISOString(),
+      };
+    } catch (error) {
+      if (error instanceof DomainValidationError) {
+        throw new BadRequestException(error.message);
+      }
+
+      if (error instanceof RiskObjectDeleteBlockedError) {
+        throw new ConflictException(error.message);
       }
 
       throw error;
@@ -490,6 +556,7 @@ export class RiskObjectController {
         departmentId: historyRecord.departmentId,
         description: historyRecord.description,
         authorName: historyRecord.authorName,
+        isDeleted: historyRecord.isDeleted,
       };
     } catch (error) {
       if (error instanceof DomainValidationError) {
@@ -519,6 +586,22 @@ export class RiskObjectController {
     }
 
     return rawValue.trim();
+  }
+
+  private async assertManageRiskObjectsPermission(request: RequestWithAuthUser | undefined): Promise<void> {
+    const userId = request?.authenticatedUser?.userId?.trim();
+    if (!userId) {
+      throw new UnauthorizedException('Access denied.');
+    }
+
+    const authorizationHeader = request?.headers?.authorization;
+    const normalizedAuth = typeof authorizationHeader === 'string' ? authorizationHeader : undefined;
+
+    await this.userPermissionChecker.assertAccess({
+      userId,
+      permission: 'MANAGE_RISK_OBJECTS',
+      ...(normalizedAuth !== undefined ? { authorizationHeader: normalizedAuth } : {}),
+    });
   }
 
   private assertLocalRequestOnly(request: Request, remoteAddress?: string): void {

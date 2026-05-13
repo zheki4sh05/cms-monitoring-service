@@ -4,18 +4,31 @@ import type {
   IntegrationConfigDetails,
   IntegrationConfigRepository,
 } from '../ports/integration-config-repository.port.js';
+import type { RiskObjectRepository } from '../../risk-object/ports/risk-object-repository.port.js';
+import {
+  type ResolvedRiskObjectModelForIntegration,
+  resolveRiskObjectModelForIntegration,
+} from './resolve-risk-object-model-for-integration.js';
 
 export interface GetIntegrationConfigByIdInput {
   companyId: string;
   integrationConfigId: string;
 }
 
+export type GetIntegrationConfigByIdResult = IntegrationConfigDetails & {
+  isDeleted: boolean;
+  riskObjectModel: ResolvedRiskObjectModelForIntegration;
+};
+
 export class GetIntegrationConfigByIdUseCase {
   private readonly logger = new Logger(GetIntegrationConfigByIdUseCase.name);
 
-  constructor(private readonly integrationConfigRepository: IntegrationConfigRepository) {}
+  constructor(
+    private readonly integrationConfigRepository: IntegrationConfigRepository,
+    private readonly riskObjectRepository: RiskObjectRepository,
+  ) {}
 
-  async execute(input: GetIntegrationConfigByIdInput): Promise<IntegrationConfigDetails | null> {
+  async execute(input: GetIntegrationConfigByIdInput): Promise<GetIntegrationConfigByIdResult | null> {
     this.logger.log(
       `Get integration config started (companyId=${input.companyId?.trim()}, id=${input.integrationConfigId?.trim()})`,
     );
@@ -28,8 +41,33 @@ export class GetIntegrationConfigByIdUseCase {
     }
 
     const numericId = this.parseIntegrationConfigId(input.integrationConfigId.trim());
+    const companyId = input.companyId.trim();
     this.logger.log(`Validation passed, loading integration config id=${numericId}`);
-    return this.integrationConfigRepository.getById(input.companyId.trim(), numericId);
+
+    const live = await this.integrationConfigRepository.getById(companyId, numericId);
+    if (live) {
+      const riskObjectModel = await resolveRiskObjectModelForIntegration(
+        this.riskObjectRepository,
+        companyId,
+        live.riskObjectModelId,
+      );
+      return { ...live, isDeleted: false, riskObjectModel };
+    }
+
+    const fromHistory = await this.integrationConfigRepository.getLatestSnapshotFromHistory(
+      companyId,
+      numericId,
+    );
+    if (fromHistory) {
+      const riskObjectModel = await resolveRiskObjectModelForIntegration(
+        this.riskObjectRepository,
+        companyId,
+        fromHistory.riskObjectModelId,
+      );
+      return { ...fromHistory, isDeleted: true, riskObjectModel };
+    }
+
+    return null;
   }
 
   private parseIntegrationConfigId(value: string): number {

@@ -33,12 +33,26 @@ export class GetRiskObjectChangeHistoryUseCase {
     }
 
     const q = input.q?.trim();
+    const companyId = input.companyId.trim();
 
-    return this.riskObjectRepository.getChangeHistoryPage(
-      input.companyId.trim(),
+    const page = await this.riskObjectRepository.getChangeHistoryPage(
+      companyId,
       input.page,
       input.pageSize,
       q ? q : undefined,
     );
+
+    const riskIds = [...new Set(page.items.map((i) => i.riskObjectId))];
+    const liveIds = await this.riskObjectRepository.findLiveRiskObjectIds(companyId, riskIds);
+
+    const items: RiskObjectChangeHistoryItem[] = page.items.map((item) => ({
+      ...item,
+      isDeleted: !liveIds.has(item.riskObjectId),
+    }));
+
+    return {
+      items,
+      hasMore: page.hasMore,
+    };
   }
 }

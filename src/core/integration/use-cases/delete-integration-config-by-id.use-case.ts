@@ -5,6 +5,7 @@ import type { IntegrationConfigRepository } from '../ports/integration-config-re
 export interface DeleteIntegrationConfigByIdInput {
   companyId: string;
   integrationConfigId: string;
+  authorName: string;
 }
 
 export class DeleteIntegrationConfigByIdUseCase {
@@ -25,8 +26,9 @@ export class DeleteIntegrationConfigByIdUseCase {
     }
 
     const id = this.parseIntegrationConfigId(input.integrationConfigId.trim());
+    const authorName = input.authorName?.trim() || 'Unknown';
     this.logger.log(`Validation passed, deleting integration config id=${id}`);
-    return this.integrationConfigRepository.deleteById(input.companyId.trim(), id);
+    return this.integrationConfigRepository.deleteById(input.companyId.trim(), id, authorName);
   }
 
   private parseIntegrationConfigId(value: string): number {

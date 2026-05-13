@@ -26,4 +26,10 @@ export class GetRiskObjectByIdResponseDto {
     example: '{"external_id":null,"attributes":[{"key":null,"value":null}]}',
   })
   definition!: string;
+
+  @ApiProperty({
+    example: false,
+    description: 'true, если объект удалён из risk_object (поля восстановлены из последней записи истории)',
+  })
+  isDeleted!: boolean;
 }

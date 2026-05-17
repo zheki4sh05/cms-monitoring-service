@@ -54,6 +54,20 @@ class PullConfigDto {
   sinceStartDateEnabled!: boolean;
 }
 
+class IntegrationRiskObjectModelDetailDto {
+  @ApiProperty({ example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890' })
+  id!: string;
+
+  @ApiProperty({
+    example: 'ООО «Вектор»',
+    description: 'Имя из risk_object или истории; «Не найдено» / «Не задано», если ссылка неразрешима',
+  })
+  name!: string;
+
+  @ApiProperty({ example: false })
+  isDeleted!: boolean;
+}
+
 export class GetIntegrationConfigByIdResponseDto {
   @ApiProperty({ example: 'ic-1' })
   id!: string;
@@ -112,4 +126,7 @@ export class GetIntegrationConfigByIdResponseDto {
     description: 'true, если интеграция удалена из основной таблицы (ответ восстановлен из истории изменений)',
   })
   isDeleted!: boolean;
+
+  @ApiProperty({ type: () => IntegrationRiskObjectModelDetailDto })
+  riskObjectModel!: IntegrationRiskObjectModelDetailDto;
 }

@@ -314,6 +314,7 @@ export class IntegrationConfigController {
         authorName: config.authorName,
         updatedAt: config.updatedAt.toISOString(),
         isDeleted: config.isDeleted,
+        riskObjectModel: config.riskObjectModel,
       };
     } catch (error) {
       if (error instanceof DomainValidationError) {
@@ -378,6 +379,7 @@ export class IntegrationConfigController {
         authorName: config.authorName,
         updatedAt: config.updatedAt.toISOString(),
         isDeleted: config.isDeleted,
+        riskObjectModel: config.riskObjectModel,
       };
     } catch (error) {
       if (error instanceof DomainValidationError) {

@@ -1,3 +1,4 @@
+import { ORPHAN_REFERENCE_LABELS } from '../../shared/constants/orphan-reference-labels.js';
 import { DomainValidationError } from '../../shared/errors/domain-validation.error.js';
 import type {
   RiskObjectListItem,
@@ -34,11 +35,20 @@ export class GetRiskObjectsUseCase {
     }
 
     const nameFilter = input.name?.trim() ? input.name.trim() : undefined;
-    return this.riskObjectRepository.getListPage(
+    const page = await this.riskObjectRepository.getListPage(
       input.companyId.trim(),
       input.page,
       input.pageSize,
       nameFilter,
     );
+    return {
+      hasMore: page.hasMore,
+      items: page.items.map((item) => ({
+        ...item,
+        name: item.name?.trim() || ORPHAN_REFERENCE_LABELS.parentNotFound,
+        code: item.code?.trim() || ORPHAN_REFERENCE_LABELS.placeholderCode,
+        departmentId: item.departmentId?.trim() || ORPHAN_REFERENCE_LABELS.notSet,
+      })),
+    };
   }
 }

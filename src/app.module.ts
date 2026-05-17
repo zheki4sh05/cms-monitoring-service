@@ -135,9 +135,11 @@ import { RiskObjectController } from './web/risk-object/risk-object.controller.j
     },
     {
       provide: GetIntegrationConfigByIdUseCase,
-      inject: [INTEGRATION_CONFIG_REPOSITORY],
-      useFactory: (integrationConfigRepository: IntegrationConfigRepository) =>
-        new GetIntegrationConfigByIdUseCase(integrationConfigRepository),
+      inject: [INTEGRATION_CONFIG_REPOSITORY, RISK_OBJECT_REPOSITORY],
+      useFactory: (
+        integrationConfigRepository: IntegrationConfigRepository,
+        riskObjectRepository: RiskObjectRepository,
+      ) => new GetIntegrationConfigByIdUseCase(integrationConfigRepository, riskObjectRepository),
     },
     {
       provide: UpdateIntegrationConfigByIdUseCase,

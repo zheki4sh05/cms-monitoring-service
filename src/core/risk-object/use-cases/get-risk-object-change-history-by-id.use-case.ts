@@ -1,3 +1,4 @@
+import { ORPHAN_REFERENCE_LABELS } from '../../shared/constants/orphan-reference-labels.js';
 import { DomainValidationError } from '../../shared/errors/domain-validation.error.js';
 import type {
   RiskObjectChangeHistoryDetails,
@@ -31,9 +32,14 @@ export class GetRiskObjectChangeHistoryByIdUseCase {
     }
 
     const liveIds = await this.riskObjectRepository.findLiveRiskObjectIds(companyId, [details.riskObjectId]);
+    const isDeleted = !liveIds.has(details.riskObjectId);
     return {
       ...details,
-      isDeleted: !liveIds.has(details.riskObjectId),
+      riskObjectName: details.riskObjectName?.trim() || ORPHAN_REFERENCE_LABELS.parentNotFound,
+      departmentId: details.departmentId?.trim() || ORPHAN_REFERENCE_LABELS.notSet,
+      description: details.description?.trim() || ORPHAN_REFERENCE_LABELS.notSet,
+      authorName: details.authorName?.trim() || ORPHAN_REFERENCE_LABELS.notSet,
+      isDeleted,
     };
   }
 

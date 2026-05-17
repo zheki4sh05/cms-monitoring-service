@@ -1,3 +1,4 @@
+import { ORPHAN_REFERENCE_LABELS } from '../../shared/constants/orphan-reference-labels.js';
 import { DomainValidationError } from '../../shared/errors/domain-validation.error.js';
 import type {
   IntegrationConfigHistoryItem,
@@ -50,10 +51,16 @@ export class GetIntegrationConfigChangeHistoryUseCase {
       integrationIds,
     );
 
-    const items: IntegrationConfigHistoryItem[] = page.items.map((item) => ({
-      ...item,
-      isDeleted: !liveIds.has(item.integrationId),
-    }));
+    const items: IntegrationConfigHistoryItem[] = page.items.map((item) => {
+      const isDeleted = !liveIds.has(item.integrationId);
+      return {
+        ...item,
+        isDeleted,
+        configName: item.configName?.trim() || (isDeleted ? ORPHAN_REFERENCE_LABELS.deleted : ORPHAN_REFERENCE_LABELS.parentNotFound),
+        description: item.description?.trim() || ORPHAN_REFERENCE_LABELS.notSet,
+        authorName: item.authorName?.trim() || ORPHAN_REFERENCE_LABELS.notSet,
+      };
+    });
 
     return {
       items,
